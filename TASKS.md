@@ -15,11 +15,10 @@ Remaining: **38 pts**.
 
 ## In Progress
 
-- (none)
+- [01 — Scaffold & auth foundation](tasks/01-scaffold-auth.md) · 5 pts · `feature/scaffold-auth`
 
 ## Backlog
 
-- [01 — Scaffold & auth foundation](tasks/01-scaffold-auth.md) · 5 pts · `feature/scaffold-auth`
 - [02 — Enable Banking connection](tasks/02-bank-connect.md) · 8 pts · `feature/bank-connect`
 - [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · `feature/sheet-setup` — independent of 02; may be swapped or built in parallel
 - [04 — Transaction fetching](tasks/04-transactions.md) · 3 pts · `feature/transactions`
