@@ -11,11 +11,12 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **38 pts**.
+Remaining: **40 pts**.
 
 ## In Progress
 
 - [01 — Scaffold & auth foundation](tasks/01-scaffold-auth.md) · 5 pts · `feature/scaffold-auth`
+- [10 — Swagger API docs](tasks/10-api-docs.md) · 2 pts · rides on `feature/scaffold-auth`
 
 ## Backlog
 

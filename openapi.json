@@ -1,0 +1,182 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CleanSheets Backend",
+    "version": "1.0.0",
+    "description": "Bridge between the CleanSheets iOS app, Google Sheets, Enable Banking, and Supabase. All endpoints require `Authorization: Bearer <google_id_token>` unless noted. Sign in with Google at the top of this page to auto-authorize Try-it-out requests."
+  },
+  "servers": [
+    { "url": "/", "description": "This deployment" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "googleIdToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Google ID token issued for the CleanSheets client ID"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "SHEET_WRITE_FAILED",
+              "SHEET_NOT_FOUND",
+              "BANK_TOKEN_EXPIRED",
+              "GOOGLE_TOKEN_EXPIRED",
+              "SUPABASE_ERROR",
+              "CATEGORY_NOT_FOUND",
+              "INVALID_REQUEST"
+            ]
+          },
+          "message": { "type": "string" }
+        }
+      },
+      "ColumnMapping": {
+        "type": "object",
+        "description": "Per-section column layout, e.g. { \"Expenses\": { \"category_col\": \"F\", \"actual_col\": \"H\" } }",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["category_col", "actual_col"],
+          "properties": {
+            "category_col": { "type": "string", "pattern": "^[A-Z]{1,2}$", "example": "F" },
+            "actual_col": { "type": "string", "pattern": "^[A-Z]{1,2}$", "example": "H" },
+            "budget_col": { "type": "string", "pattern": "^[A-Z]{1,2}$", "example": "G" },
+            "left_col": { "type": "string", "pattern": "^[A-Z]{1,2}$", "example": "I" }
+          }
+        }
+      },
+      "UserConfig": {
+        "type": "object",
+        "properties": {
+          "sheetId": { "type": "string", "nullable": true },
+          "columnMapping": {
+            "allOf": [{ "$ref": "#/components/schemas/ColumnMapping" }],
+            "nullable": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Missing or invalid Google ID token",
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+        }
+      }
+    }
+  },
+  "security": [{ "googleIdToken": [] }],
+  "paths": {
+    "/api/auth/google": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Sign in — verify ID token and create the user row if missing",
+        "responses": {
+          "200": {
+            "description": "Signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "googleId": { "type": "string" },
+                    "hasConfig": { "type": "boolean", "description": "true when a sheet_id is saved" },
+                    "hasSheetsAccess": { "type": "boolean", "description": "true when a Sheets-scope refresh token is stored" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "get": {
+        "tags": ["auth"],
+        "summary": "Start the Google Sheets consent flow (action=start)",
+        "description": "Returns the Google consent URL that grants the backend a Sheets-scope refresh token. Open the returned URL in a browser. The callback (`/auth/google/callback`) is browser-only and not testable here.",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["start"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consent URL",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "url": { "type": "string" } } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": {
+            "description": "Unsupported method or action",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/config": {
+      "get": {
+        "tags": ["user"],
+        "summary": "Get the caller's saved config",
+        "responses": {
+          "200": {
+            "description": "Current config (fields are null until saved)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/UserConfig" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["user"],
+        "summary": "Save sheet ID and/or column mapping",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sheetId": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{20,100}$" },
+                  "columnMapping": { "$ref": "#/components/schemas/ColumnMapping" }
+                }
+              },
+              "example": {
+                "columnMapping": { "Expenses": { "category_col": "F", "budget_col": "G", "actual_col": "H", "left_col": "I" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved config",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/UserConfig" } }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  }
+}

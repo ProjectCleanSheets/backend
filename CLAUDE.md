@@ -27,8 +27,9 @@ backend/
 │   │   └── budget.ts          — budget overview data
 │   ├── transactions/
 │   │   └── index.ts           — fetch transactions from Enable Banking
-│   └── user/
-│       └── config.ts          — get/post user config from Supabase
+│   ├── user/
+│   │   └── config.ts          — get/post user config from Supabase
+│   └── docs.ts                — Swagger UI (serves openapi.json)
 ├── lib/
 │   ├── supabase.ts            — Supabase client singleton
 │   ├── sheets.ts              — Google Sheets API helper
@@ -36,6 +37,7 @@ backend/
 │   └── crypto.ts              — token encryption/decryption
 ├── supabase/migrations/       — SQL migrations
 ├── tasks/                     — task board task files (see TASKS.md)
+├── openapi.json               — OpenAPI spec, rendered at /api/docs
 ├── TASKS.md                   — task board
 ├── tsconfig.json
 └── package.json
@@ -153,6 +155,8 @@ Users table keyed to Google ID. Stores:
 - Sandbox vs production controlled by env var, never by code branching on feature names
 - No over-engineering — if it's not needed for the current feature, don't build it
 - No free tier enforcement logic in this release
+- Every added or changed endpoint MUST be reflected in `openapi.json` (rendered at
+  `/api/docs`) in the same branch — the Swagger page is the primary manual test tool
 
 ## Key Files to Read First
 Before making changes, always read:
