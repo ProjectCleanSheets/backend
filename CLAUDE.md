@@ -126,6 +126,7 @@ SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY      — server-side only; RLS is enabled, anon key cannot access tables
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI            — optional; defaults to production callback, set to localhost in Development
 ENABLE_BANKING_APP_ID
 ENABLE_BANKING_PRIVATE_KEY     — full PEM contents as a single env var
 ENABLE_BANKING_ENV             — "sandbox" or "production"

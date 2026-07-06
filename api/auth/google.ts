@@ -5,9 +5,11 @@ import { encryptToken } from '../../lib/crypto';
 import { sendError } from '../../lib/errors';
 import { getSupabase } from '../../lib/supabase';
 
-// Registered on the CleanSheets Backend OAuth client (see CLAUDE.md).
+// Must be registered on the CleanSheets Backend OAuth client (see CLAUDE.md).
 // vercel.json rewrites /auth/google/callback → /api/auth/google?action=callback
-const REDIRECT_URI = 'https://backend-beryl-phi-32.vercel.app/auth/google/callback';
+// Locally, GOOGLE_REDIRECT_URI points at localhost so the flow round-trips in dev.
+const REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI ?? 'https://backend-beryl-phi-32.vercel.app/auth/google/callback';
 // Deep link the iOS app's ASWebAuthenticationSession listens on.
 const APP_CALLBACK = 'cleansheets://oauth/google';
 // Sheets scope: the stored refresh token must be able to call the Sheets API (task 03).

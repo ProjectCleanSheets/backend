@@ -35,6 +35,9 @@ Remaining: **40 pts**.
 
 ## Deferred / not scheduled
 
+- Separate dev Supabase project — local dev currently talks to the production database;
+  fine pre-launch, split before real users exist.
+
 - Rate limiting / abuse throttling — impractical on Vercel free tier without extra infra; revisit before public launch.
 - Free-tier enforcement (30 transactions/month) — explicitly out of this release per CLAUDE.md.
 - Server-side push notifications — V2 per product spec.
