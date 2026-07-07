@@ -15,3 +15,8 @@ create table if not exists public.users (
 -- RLS on with no policies: only the backend (service role, bypasses RLS) can
 -- access this table. Per-user isolation is enforced in backend code.
 alter table public.users enable row level security;
+
+-- The project has "automatically expose new tables" disabled, so privileges
+-- must be granted explicitly. Only service_role — anon/authenticated get nothing.
+grant usage on schema public to service_role;
+grant all privileges on table public.users to service_role;

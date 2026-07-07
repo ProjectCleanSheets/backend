@@ -139,6 +139,10 @@ Switching from sandbox to production is purely an `ENABLE_BANKING_ENV` change. N
 Before implementing, research current best practices for encrypting OAuth tokens stored in Supabase with Node.js on Vercel. Use AES-256-GCM with `ENCRYPTION_KEY` env var (see Security Requirements). The crypto helper lives in `lib/crypto.ts`.
 
 ## Supabase Schema
+The project has "automatically expose new tables" disabled: every new table's
+migration MUST explicitly `grant all privileges on table ... to service_role`
+(and never to anon/authenticated).
+
 Users table keyed to Google ID. Stores:
 - `google_id` (primary key)
 - `sheet_id` — Google Sheet ID
