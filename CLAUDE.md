@@ -130,6 +130,7 @@ GOOGLE_REDIRECT_URI            — optional; defaults to production callback, se
 ENABLE_BANKING_APP_ID
 ENABLE_BANKING_PRIVATE_KEY     — full PEM contents as a single env var
 ENABLE_BANKING_ENV             — "sandbox" or "production"
+ENABLE_BANKING_REDIRECT_URI    — optional; defaults to production callback, set to localhost in Development
 ENCRYPTION_KEY                 — AES-256-GCM key for encrypting tokens in Supabase
 ```
 

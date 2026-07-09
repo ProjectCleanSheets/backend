@@ -127,6 +127,64 @@
         }
       }
     },
+    "/api/auth/bank": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Start the Enable Banking consent flow",
+        "description": "Returns the bank authorization URL (MitID in production, instant approval at Mock ASPSP in sandbox). Open the returned URL in a browser. In sandbox `bank`/`country` default to the Mock ASPSP; in production both are required. The callback (`/auth/bank/callback`) is browser-only and not testable here.",
+        "parameters": [
+          {
+            "name": "bank",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "description": "ASPSP name as listed by Enable Banking, e.g. \"Nordea\""
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "pattern": "^[A-Z]{2}$", "example": "DK" },
+            "description": "Two-letter ISO country code of the bank"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bank authorization URL",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "url": { "type": "string" } } }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid bank selection or bank rejected the request",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": {
+            "description": "Unsupported method or action",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "Server configuration, credential, or storage failure — message names the failing step",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "502": {
+            "description": "Enable Banking unavailable",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
     "/api/user/config": {
       "get": {
         "tags": ["user"],

@@ -13,12 +13,10 @@
     "dotenv": "^17.4.2",
     "google-auth-library": "^10.9.0",
     "googleapis": "^173.0.0",
-    "node-jose": "^2.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
-    "@types/node-jose": "^1.1.13",
     "@vercel/node": "^5.8.22",
     "typescript": "^6.0.3"
   }
