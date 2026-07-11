@@ -13,7 +13,12 @@
   - Cross-reference the `_log` tab of the user's Google Sheet and filter out
     already-categorized transactionIds
   - Return only uncategorized transactions, newest first
-  - Each transaction: `id`, merchant name, `amount`, `currency`, `date`
+  - Each transaction: `id`, merchant name, `amount`, `currency`, `date`, `direction`
+    (debit/credit), `status` (booked/pending)
+  - Pending (reserved) transactions ARE included, marked `status: "pending"` —
+    product decision 2026-07-11: a purchase must appear while the user still
+    remembers it; spec §7b's id-reissue-on-settlement risk accepted as rare.
+    Cancelled/rejected entries and entries without a bank-assigned id are dropped.
 
 ## Out of scope
 

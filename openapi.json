@@ -74,7 +74,7 @@
       },
       "Transaction": {
         "type": "object",
-        "required": ["id", "merchant", "amount", "currency", "date", "direction"],
+        "required": ["id", "merchant", "amount", "currency", "date", "direction", "status"],
         "properties": {
           "id": {
             "type": "string",
@@ -92,6 +92,11 @@
             "type": "string",
             "enum": ["debit", "credit"],
             "description": "debit = money out (spend), credit = money in (income/refund)"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["booked", "pending"],
+            "description": "pending = reserved at the bank, not yet settled — shown instantly so the user recognizes the purchase; amount (and rarely id) can still change when it books"
           }
         }
       },
@@ -276,7 +281,7 @@
       "get": {
         "tags": ["transactions"],
         "summary": "Fetch uncategorized bank transactions, newest first",
-        "description": "Fetches booked transactions from the last 30 days via the caller's stored Enable Banking session (all consented accounts), filters out transactionIds already present in column A of the sheet's `_log` tab, and returns the rest newest first. Returns `BANK_TOKEN_EXPIRED` when the bank consent is missing, expired, or revoked — sessions cannot be refreshed, the user must reconnect. A missing `_log` tab is not an error: nothing is filtered and `logTabMissing` is true so the app can warn.",
+        "description": "Fetches booked and pending (reserved) transactions from the last 30 days via the caller's stored Enable Banking session (all consented accounts), filters out transactionIds already present in column A of the sheet's `_log` tab, and returns the rest newest first. Pending transactions are included so a purchase appears while the user still remembers it; they carry `status: \"pending\"`. Returns `BANK_TOKEN_EXPIRED` when the bank consent is missing, expired, or revoked — sessions cannot be refreshed, the user must reconnect. A missing `_log` tab is not an error: nothing is filtered and `logTabMissing` is true so the app can warn.",
         "responses": {
           "200": {
             "description": "Uncategorized transactions, newest first",

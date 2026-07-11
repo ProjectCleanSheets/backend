@@ -29,6 +29,10 @@ interface QueueTransaction {
   currency: string;
   date: string;
   direction: 'debit' | 'credit';
+  // "pending" = reserved at the bank, not yet settled. Shown instantly so the
+  // user still remembers the purchase (product decision); the amount and, per
+  // spec §7b rarely, the id can still change when it books.
+  status: 'booked' | 'pending';
 }
 
 // Carries the exact status + code for failures the endpoint detects itself
@@ -197,13 +201,16 @@ async function readLoggedIds(
 
 /**
  * Maps an Enable Banking transaction to the queue shape, or null for entries
- * the queue cannot use: only booked (BOOK) transactions have settled,
- * bank-assigned ids — pending ones may be reissued under a different id
- * (spec §7b), which would break dedup. Exported so the mapping can be
- * exercised directly; Vercel only routes the default export.
+ * the queue cannot use. Booked (BOOK) and pending (PDNG) both appear — a
+ * reserved Danske payment must show up while the user still remembers it
+ * (product decision; spec §7b's id-reissue-on-settlement risk accepted as
+ * rare). Cancelled/rejected/informational entries and entries without a
+ * bank-assigned id (nothing to dedup or save against) are dropped. Exported
+ * so the mapping can be exercised directly; Vercel only routes the default
+ * export.
  */
 export function toQueueTransaction(tx: EbTransaction): QueueTransaction | null {
-  if (tx.status !== 'BOOK') {
+  if (tx.status !== 'BOOK' && tx.status !== 'PDNG') {
     return null;
   }
   const id = tx.entry_reference || tx.transaction_id;
@@ -230,5 +237,6 @@ export function toQueueTransaction(tx: EbTransaction): QueueTransaction | null {
     currency: tx.transaction_amount?.currency ?? '',
     date: tx.booking_date ?? tx.transaction_date ?? tx.value_date ?? '',
     direction,
+    status: tx.status === 'BOOK' ? 'booked' : 'pending',
   };
 }
