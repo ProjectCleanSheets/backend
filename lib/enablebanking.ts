@@ -138,6 +138,20 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
+  const url = new URL(`${API_BASE}${path}`);
+  for (const [key, value] of Object.entries(params ?? {})) {
+    url.searchParams.set(key, value);
+  }
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${signApiJwt()}` },
+  });
+  if (!response.ok) {
+    throw new EnableBankingError(response.status, path, await errorDetail(response));
+  }
+  return (await response.json()) as T;
+}
+
 /**
  * Starts a consent flow at the given bank and returns the URL the user must
  * open to authorize (MitID for Danish banks, instant approval at Mock ASPSP).
@@ -161,4 +175,64 @@ export async function exchangeCode(code: string): Promise<BankSession> {
     code,
   });
   return { sessionId: data.session_id, validUntil: data.access.valid_until };
+}
+
+// Session state per GET /sessions/{id}. Anything other than AUTHORIZED
+// (expired, closed, revoked at the bank) means the consent is unusable.
+export interface SessionDetails {
+  status: string;
+  accounts: string[];
+}
+
+/** Fetches the session's status and the account uids it grants access to. */
+export async function getSession(sessionId: string): Promise<SessionDetails> {
+  const data = await get<{ status: string; accounts: string[] }>(
+    `/sessions/${encodeURIComponent(sessionId)}`,
+  );
+  return { status: data.status, accounts: data.accounts ?? [] };
+}
+
+// The transaction fields the backend consumes — the API returns more, but
+// nothing else is needed and unknown fields are ignored by JSON parsing.
+export interface EbTransaction {
+  entry_reference?: string | null;
+  transaction_id?: string | null;
+  transaction_amount?: { currency?: string | null; amount?: string | null } | null;
+  creditor?: { name?: string | null } | null;
+  debtor?: { name?: string | null } | null;
+  credit_debit_indicator?: string | null; // "DBIT" | "CRDT"
+  status?: string | null; // "BOOK" | "PDNG" | ...
+  booking_date?: string | null;
+  transaction_date?: string | null;
+  value_date?: string | null;
+  remittance_information?: (string | null)[] | null;
+}
+
+// Guards against a runaway continuation_key loop; a personal account's
+// 30-day window fits comfortably in far fewer pages.
+const MAX_TRANSACTION_PAGES = 10;
+
+/**
+ * Fetches all transactions for one account from `dateFrom` (YYYY-MM-DD, UTC)
+ * to today, following continuation_key pagination.
+ */
+export async function fetchAccountTransactions(
+  accountUid: string,
+  dateFrom: string,
+): Promise<EbTransaction[]> {
+  const path = `/accounts/${encodeURIComponent(accountUid)}/transactions`;
+  const transactions: EbTransaction[] = [];
+  let continuationKey: string | undefined;
+  for (let page = 0; page < MAX_TRANSACTION_PAGES; page++) {
+    const data = await get<{ transactions?: EbTransaction[]; continuation_key?: string | null }>(
+      path,
+      { date_from: dateFrom, ...(continuationKey ? { continuation_key: continuationKey } : {}) },
+    );
+    transactions.push(...(data.transactions ?? []));
+    if (!data.continuation_key) {
+      break;
+    }
+    continuationKey = data.continuation_key;
+  }
+  return transactions;
 }

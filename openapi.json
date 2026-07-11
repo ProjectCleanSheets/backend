@@ -72,6 +72,43 @@
           }
         }
       },
+      "Transaction": {
+        "type": "object",
+        "required": ["id", "merchant", "amount", "currency", "date", "direction"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Bank-assigned transaction id (Enable Banking entry_reference) — the canonical dedup key written to _log on save"
+          },
+          "merchant": { "type": "string", "example": "Netto" },
+          "amount": {
+            "type": "number",
+            "description": "Always positive — direction carries the sign",
+            "example": 195.32
+          },
+          "currency": { "type": "string", "example": "DKK" },
+          "date": { "type": "string", "format": "date", "example": "2026-07-10" },
+          "direction": {
+            "type": "string",
+            "enum": ["debit", "credit"],
+            "description": "debit = money out (spend), credit = money in (income/refund)"
+          }
+        }
+      },
+      "TransactionQueue": {
+        "type": "object",
+        "required": ["transactions", "logTabMissing"],
+        "properties": {
+          "transactions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Transaction" }
+          },
+          "logTabMissing": {
+            "type": "boolean",
+            "description": "true when the sheet has no _log tab — nothing was filtered out; the app should warn the user"
+          }
+        }
+      },
       "SheetStructure": {
         "type": "object",
         "required": ["tab", "sections"],
@@ -216,6 +253,51 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "405": {
             "description": "Unsupported method or action",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "Server configuration, credential, or storage failure — message names the failing step",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "502": {
+            "description": "Enable Banking unavailable",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/transactions": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Fetch uncategorized bank transactions, newest first",
+        "description": "Fetches booked transactions from the last 30 days via the caller's stored Enable Banking session (all consented accounts), filters out transactionIds already present in column A of the sheet's `_log` tab, and returns the rest newest first. Returns `BANK_TOKEN_EXPIRED` when the bank consent is missing, expired, or revoked — sessions cannot be refreshed, the user must reconnect. A missing `_log` tab is not an error: nothing is filtered and `logTabMissing` is true so the app can warn.",
+        "responses": {
+          "200": {
+            "description": "Uncategorized transactions, newest first",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TransactionQueue" } }
+            }
+          },
+          "401": {
+            "description": "`GOOGLE_TOKEN_EXPIRED` (missing/invalid ID token) or `BANK_TOKEN_EXPIRED` (bank consent missing, expired, or revoked — reconnect)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "404": {
+            "description": "No sheet configured yet, or the configured sheet is not accessible",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "405": {
+            "description": "Unsupported method",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }
