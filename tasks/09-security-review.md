@@ -17,10 +17,18 @@
 - Check dependency advisories (`npm audit`) and fix or document exceptions.
 - Fix all confirmed findings; document accepted risks (e.g. deferred rate limiting) in
   TASKS.md's Deferred section.
+- **Rotate all shared secrets** — on 2026-07-11 the full `.env` contents were pasted
+  into a chat transcript, so treat these as burned before any production use:
+  - `ENCRYPTION_KEY` (generate new; re-encrypt or invalidate stored tokens)
+  - `GOOGLE_CLIENT_SECRET` (regenerate in Google Cloud Console)
+  - `SUPABASE_SERVICE_ROLE_KEY` (rotate in Supabase dashboard)
+  - `ENABLE_BANKING_PRIVATE_KEY` (new key pair in the Enable Banking control panel)
+  Update Vercel env vars, local `.env`/`.env.local`, and CREDENTIALS.md afterwards.
 
 ## Acceptance criteria
 
 - [ ] Security review run with no unresolved high/medium findings.
+- [ ] All four exposed secrets rotated and verified working (see Scope).
 - [ ] Every Security Requirements item verified in code, with file references noted in
       the review summary.
 - [ ] `npm audit` clean or exceptions documented.
