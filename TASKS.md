@@ -37,6 +37,10 @@ Remaining: **17 pts**.
 - Separate dev Supabase project — local dev currently talks to the production database;
   fine pre-launch, split before real users exist.
 
+- Pending-transaction reconciliation on booking — the queue includes reserved
+  (pending) transactions by product decision 2026-07-11 (instant categorization);
+  amount drift and rare id reissue after settlement are accepted for MVP
+  (see tasks/04-transactions.md). V2: reconcile amounts / detect reissued ids.
 - Rate limiting / abuse throttling — impractical on Vercel free tier without extra infra; revisit before public launch.
 - Free-tier enforcement (30 transactions/month) — explicitly out of this release per CLAUDE.md.
 - Server-side push notifications — V2 per product spec.

@@ -96,6 +96,14 @@ The iOS app sends `{ section: "Expenses", category: "Groceries", amount: 195.32,
 
 The iOS app never sends cell references. All sheet navigation happens in the backend.
 
+**Pending transactions (product decision 2026-07-11):** `GET /api/transactions`
+includes reserved/pending bank transactions (marked `status: "pending"`) so users
+can categorize a purchase instantly, while they still remember it. Accepted
+trade-offs: the saved amount may drift from the finally booked amount, and (rarely)
+a booked transaction reappears under a new id. Reconciliation is deferred to V2 —
+see `tasks/04-transactions.md` for details. Do not change this behavior without a
+new product decision.
+
 ## Sheet Column Mapping
 Default columns (user-configurable, stored in Supabase):
 - Column F — category names

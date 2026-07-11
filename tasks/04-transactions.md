@@ -19,6 +19,16 @@
     product decision 2026-07-11: a purchase must appear while the user still
     remembers it; spec §7b's id-reissue-on-settlement risk accepted as rare.
     Cancelled/rejected entries and entries without a bank-assigned id are dropped.
+  - **Accepted drift consequences of categorizing before settlement** (do not
+    "fix" these without a new product decision):
+    - *Amount drift*: a reserved amount can change when it books (tips, fuel
+      pumps, currency conversion). The sheet keeps the amount saved at
+      categorization time — the id stays filtered via `_log`, so the booked
+      version never reappears for correction.
+    - *Id reissue (rare)*: if the bank books a reserved transaction under a new
+      id, it reappears in the queue as new; the user skips it or fixes the sheet
+      manually.
+    - Reconciliation on booking is deferred to V2 — see TASKS.md Deferred.
 
 ## Out of scope
 

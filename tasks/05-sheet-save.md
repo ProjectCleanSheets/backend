@@ -27,6 +27,13 @@
 
 Column positions come from the user's `column_mapping` in Supabase.
 
+**Note on pending transactions:** the queue (task 04) includes pending
+(reserved) bank transactions, so saves can arrive for transactions that have
+not settled yet. The amount written to `_log` and the Actual cell may therefore
+differ from the finally booked amount — this drift is an accepted product
+decision (see `tasks/04-transactions.md`); do NOT add reconciliation logic
+(deferred to V2 per TASKS.md).
+
 ## Out of scope
 
 - Creating new categories (task 06), free-tier save counting (never)
