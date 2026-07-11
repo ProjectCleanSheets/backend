@@ -11,11 +11,11 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **25 pts**.
+Remaining: **17 pts**.
 
 ## In Progress
 
-- [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · `feature/sheet-setup` — independent of 02; may be swapped or built in parallel
+- (none)
 
 ## Backlog
 
@@ -28,6 +28,7 @@ Remaining: **25 pts**.
 
 ## Done
 
+- [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · merged 2026-07-11, verified end-to-end via /api/docs against the real sheet (July + June tabs; consent flow, tab list, structure detection incl. side-by-side boxes and merged banner titles)
 - [02 — Enable Banking connection](tasks/02-bank-connect.md) · 8 pts · merged 2026-07-09, verified end-to-end via /api/docs against the sandbox Mock ASPSP (encrypted session stored, 90-day expiry)
 - [01 — Scaffold & auth foundation](tasks/01-scaffold-auth.md) · 5 pts · merged 2026-07-07, verified end-to-end via /api/docs
 - [10 — Swagger API docs](tasks/10-api-docs.md) · 2 pts · merged 2026-07-07
