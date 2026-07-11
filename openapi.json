@@ -60,6 +60,56 @@
             "nullable": true
           }
         }
+      },
+      "SheetTabs": {
+        "type": "object",
+        "required": ["tabs"],
+        "properties": {
+          "tabs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["July", "August", "_log"]
+          }
+        }
+      },
+      "SheetStructure": {
+        "type": "object",
+        "required": ["tab", "sections"],
+        "properties": {
+          "tab": { "type": "string", "example": "July" },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "columns", "categories"],
+              "properties": {
+                "name": { "type": "string", "example": "Expenses" },
+                "columns": {
+                  "type": "object",
+                  "required": ["category", "budget", "actual"],
+                  "properties": {
+                    "category": { "type": "string", "example": "F" },
+                    "budget": { "type": "string", "example": "G" },
+                    "actual": { "type": "string", "example": "H" },
+                    "left": { "type": "string", "nullable": true, "example": "I" }
+                  }
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                      "name": { "type": "string", "example": "Groceries" },
+                      "budget": { "type": "number", "nullable": true, "example": 3100 },
+                      "actual": { "type": "number", "nullable": true, "example": 3580 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -178,6 +228,57 @@
           },
           "502": {
             "description": "Enable Banking unavailable",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/sheet/structure": {
+      "get": {
+        "tags": ["sheet"],
+        "summary": "List tabs, or scan one tab's sections/categories/columns",
+        "description": "Without `tab`: returns the spreadsheet's tab names. With `tab`: scans the tab and returns detected sections, their categories (with Budget/Actual values), and column positions. Opens the sheet with the caller's stored Sheets consent — a sheet the account cannot access returns `SHEET_NOT_FOUND`; missing/expired consent returns `GOOGLE_TOKEN_EXPIRED`.",
+        "parameters": [
+          {
+            "name": "sheetId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[a-zA-Z0-9_-]{20,100}$" },
+            "description": "Google Sheet ID (from the sheet URL)"
+          },
+          {
+            "name": "tab",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "description": "Tab name to scan, e.g. \"July\". Omit to list tabs."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tab list (no `tab` param) or detected structure (`tab` given)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/SheetTabs" },
+                    { "$ref": "#/components/schemas/SheetStructure" }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid sheetId or tab parameter",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "Sheet or tab not found, or not accessible to this Google account",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }

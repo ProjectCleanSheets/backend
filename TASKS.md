@@ -15,11 +15,10 @@ Remaining: **25 pts**.
 
 ## In Progress
 
-- (none)
+- [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · `feature/sheet-setup` — independent of 02; may be swapped or built in parallel
 
 ## Backlog
 
-- [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · `feature/sheet-setup` — independent of 02; may be swapped or built in parallel
 - [04 — Transaction fetching](tasks/04-transactions.md) · 3 pts · `feature/transactions`
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · `feature/sheet-save`
 - [06 — New category](tasks/06-new-category.md) · 3 pts · `feature/new-category`
