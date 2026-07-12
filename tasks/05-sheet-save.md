@@ -34,6 +34,14 @@ differ from the finally booked amount — this drift is an accepted product
 decision (see `tasks/04-transactions.md`); do NOT add reconciliation logic
 (deferred to V2 per TASKS.md).
 
+**Note on non-unique transaction ids** (found testing task 04 against Enable
+Banking's synthetic Danske data): banks sometimes reuse one `entry_reference`
+across several transaction lines — e.g. a rent payment split into Husleje/El/TV
+rows all sharing id `3567743333`. Strict "duplicate transactionId rejects the
+save" would block saving the 2nd/3rd line, and the task-04 fetch filter hides
+all lines once one is logged. Decide explicitly how dedup keys on this
+(id-only vs id+amount+date) before implementing.
+
 ## Out of scope
 
 - Creating new categories (task 06), free-tier save counting (never)
