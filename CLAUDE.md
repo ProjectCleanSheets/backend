@@ -139,6 +139,7 @@ ENABLE_BANKING_APP_ID
 ENABLE_BANKING_PRIVATE_KEY     — full PEM contents as a single env var
 ENABLE_BANKING_ENV             — "sandbox" or "production"
 ENABLE_BANKING_REDIRECT_URI    — optional; defaults to production callback, set to localhost in Development
+ENABLE_BANKING_CONSENT_DAYS    — optional, DEV ONLY: consent validity in days (float, (0, 180]; default 90). Short values (e.g. 0.01 ≈ 15 min) let the BANK_TOKEN_EXPIRED path be tested for real. Never set in production (Vercel)
 ENCRYPTION_KEY                 — AES-256-GCM key for encrypting tokens in Supabase
 ```
 

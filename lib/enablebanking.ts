@@ -13,7 +13,22 @@ const REDIRECT_URI =
 
 // PSD2 consent window requested from the bank. Banks cap this server-side
 // (180 days max under the SCA RTS); 90 days is broadly accepted.
-const CONSENT_VALIDITY_DAYS = 90;
+// ENABLE_BANKING_CONSENT_DAYS overrides it in dev only (fractional days
+// allowed, so 0.01 ≈ 15 min) to test consent expiry end-to-end — production
+// must not set it. Values outside (0, 180] fall back to the default.
+const DEFAULT_CONSENT_VALIDITY_DAYS = 90;
+
+function consentValidityDays(): number {
+  const raw = process.env.ENABLE_BANKING_CONSENT_DAYS;
+  if (!raw) {
+    return DEFAULT_CONSENT_VALIDITY_DAYS;
+  }
+  const days = Number(raw);
+  if (!Number.isFinite(days) || days <= 0 || days > 180) {
+    return DEFAULT_CONSENT_VALIDITY_DAYS;
+  }
+  return days;
+}
 const JWT_TTL_SECONDS = 3600;
 
 export interface Aspsp {
@@ -158,7 +173,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
  * `state` is echoed back on the callback redirect for CSRF validation.
  */
 export async function startAuthSession(state: string, aspsp: Aspsp): Promise<string> {
-  const validUntil = new Date(Date.now() + CONSENT_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+  const validUntil = new Date(Date.now() + consentValidityDays() * 24 * 60 * 60 * 1000);
   const data = await post<{ url: string }>('/auth', {
     access: { valid_until: validUntil.toISOString() },
     aspsp,
