@@ -11,11 +11,11 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **15 pts**.
+Remaining: **14 pts**.
 
 ## In Progress
 
-- [11 — Configurable consent validity for dev](tasks/11-consent-validity.md) · 1 pt · `feature/consent-validity` — enables real end-to-end testing of `BANK_TOKEN_EXPIRED`
+- (none)
 
 ## Backlog
 
@@ -27,6 +27,7 @@ Remaining: **15 pts**.
 
 ## Done
 
+- [11 — Configurable consent validity for dev](tasks/11-consent-validity.md) · 1 pt · merged 2026-07-12, verified end-to-end in dev with `ENABLE_BANKING_CONSENT_DAYS=0.01`: fetch 200 → `BANK_TOKEN_EXPIRED` after ~14 min → reconnect healed (both consents' `valid_until` confirmed in dev DB); unset/invalid/out-of-range values fall back to 90 days (stubbed-fetch test, 8 cases)
 - [12 — Separate dev Supabase project](tasks/12-dev-supabase.md) · 2 pts · done 2026-07-12 (no branch): `cleansheets-dev` created, migration applied, local env switched, consents re-run, config seeded; verified dev round-trip (53 txns) and prod row untouched
 - [04 — Transaction fetching](tasks/04-transactions.md) · 3 pts · merged 2026-07-12, verified end-to-end via /api/docs: seeded Mock ASPSP (date-shifted Danske sample, 53 txns in window), pagination, newest-first ordering, `_log` dedup filtering against the real sheet, pending included per product decision
 - [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · merged 2026-07-11, verified end-to-end via /api/docs against the real sheet (July + June tabs; consent flow, tab list, structure detection incl. side-by-side boxes and merged banner titles)
