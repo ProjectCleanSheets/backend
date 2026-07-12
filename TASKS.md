@@ -11,7 +11,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **17 pts**.
+Remaining: **20 pts**.
 
 ## In Progress
 
@@ -19,6 +19,8 @@ Remaining: **17 pts**.
 
 ## Backlog
 
+- [12 — Separate dev Supabase project](tasks/12-dev-supabase.md) · 2 pts · no branch (config/docs) — do BEFORE 05; local dev currently writes to the production DB
+- [11 — Configurable consent validity for dev](tasks/11-consent-validity.md) · 1 pt · `feature/consent-validity` — enables real end-to-end testing of `BANK_TOKEN_EXPIRED`
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · `feature/sheet-save`
 - [06 — New category](tasks/06-new-category.md) · 3 pts · `feature/new-category`
 - [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · `feature/budget-overview`
@@ -33,9 +35,6 @@ Remaining: **17 pts**.
 - [10 — Swagger API docs](tasks/10-api-docs.md) · 2 pts · merged 2026-07-07
 
 ## Deferred / not scheduled
-
-- Separate dev Supabase project — local dev currently talks to the production database;
-  fine pre-launch, split before real users exist.
 
 - Pending-transaction reconciliation on booking — the queue includes reserved
   (pending) transactions by product decision 2026-07-11 (instant categorization);
