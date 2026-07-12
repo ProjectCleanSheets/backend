@@ -402,6 +402,7 @@
                 }
               },
               "example": {
+                "sheetId": "1AbC-dEfGhIjKlMnOpQrStUvWxYz0123456789abcdef",
                 "columnMapping": { "Expenses": { "category_col": "F", "budget_col": "G", "actual_col": "H", "left_col": "I" } }
               }
             }
