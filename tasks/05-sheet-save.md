@@ -39,8 +39,19 @@ Banking's synthetic Danske data): banks sometimes reuse one `entry_reference`
 across several transaction lines — e.g. a rent payment split into Husleje/El/TV
 rows all sharing id `3567743333`. Strict "duplicate transactionId rejects the
 save" would block saving the 2nd/3rd line, and the task-04 fetch filter hides
-all lines once one is logged. Decide explicitly how dedup keys on this
-(id-only vs id+amount+date) before implementing.
+all lines once one is logged. **Recommended approach (owner-approved
+2026-07-12): dedup on the composite key `transactionId + amount + date`**, not
+id alone — store all three in `_log` and match on the triple both when
+rejecting duplicate saves here and when filtering the queue in
+`api/transactions/index.ts` (that filter currently matches id-only and must be
+updated in this task to stay consistent).
+
+Caveat the design must resolve: a **pending** transaction that later books can
+keep its id but change amount and/or date (see the pending-drift note above), so
+a strict triple match would resurface it and reintroduce the double-count the
+filter exists to prevent. Suggested resolution: record the transaction's
+`status` in `_log` at save time; match booked rows on the strict triple, but
+match rows saved as pending on id alone.
 
 ## Out of scope
 
