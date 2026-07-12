@@ -11,7 +11,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **17 pts**.
+Remaining: **15 pts**.
 
 ## In Progress
 
@@ -19,7 +19,6 @@ Remaining: **17 pts**.
 
 ## Backlog
 
-- [12 — Separate dev Supabase project](tasks/12-dev-supabase.md) · 2 pts · no branch (config/docs) — do BEFORE 05; local dev currently writes to the production DB
 - [11 — Configurable consent validity for dev](tasks/11-consent-validity.md) · 1 pt · `feature/consent-validity` — enables real end-to-end testing of `BANK_TOKEN_EXPIRED`
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · `feature/sheet-save`
 - [06 — New category](tasks/06-new-category.md) · 3 pts · `feature/new-category`
@@ -29,6 +28,7 @@ Remaining: **17 pts**.
 
 ## Done
 
+- [12 — Separate dev Supabase project](tasks/12-dev-supabase.md) · 2 pts · done 2026-07-12 (no branch): `cleansheets-dev` created, migration applied, local env switched, consents re-run, config seeded; verified dev round-trip (53 txns) and prod row untouched
 - [04 — Transaction fetching](tasks/04-transactions.md) · 3 pts · merged 2026-07-12, verified end-to-end via /api/docs: seeded Mock ASPSP (date-shifted Danske sample, 53 txns in window), pagination, newest-first ordering, `_log` dedup filtering against the real sheet, pending included per product decision
 - [03 — Google Sheet connection & structure](tasks/03-sheet-setup.md) · 8 pts · merged 2026-07-11, verified end-to-end via /api/docs against the real sheet (July + June tabs; consent flow, tab list, structure detection incl. side-by-side boxes and merged banner titles)
 - [02 — Enable Banking connection](tasks/02-bank-connect.md) · 8 pts · merged 2026-07-09, verified end-to-end via /api/docs against the sandbox Mock ASPSP (encrypted session stored, 90-day expiry)

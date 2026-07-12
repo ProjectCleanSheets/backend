@@ -130,7 +130,7 @@ Error codes:
 Set in Vercel dashboard. Never hardcode secrets.
 
 ```
-SUPABASE_URL
+SUPABASE_URL                   — production project on Vercel; the cleansheets-dev project in local .env
 SUPABASE_SERVICE_ROLE_KEY      — server-side only; RLS is enabled, anon key cannot access tables
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
@@ -184,6 +184,7 @@ Before making changes, always read:
 - Enable Banking sandbox redirect: `https://backend-beryl-phi-32.vercel.app/auth/bank/callback`
 - Google OAuth redirect: `https://backend-beryl-phi-32.vercel.app/auth/google/callback`
 - Vercel URL: `https://backend-beryl-phi-32.vercel.app`
-- Supabase URL: `https://hywunivmwlzaopocrkub.supabase.co`
+- Supabase URL (production): `https://hywunivmwlzaopocrkub.supabase.co` — used by the Vercel deployment ONLY
+- Supabase URL (dev): `https://iwpsheuwrxatxnpgzhbk.supabase.co` (`cleansheets-dev`) — local dev talks to this one via `.env`/`.env.local`; both projects run the same migrations from `supabase/migrations/`
 - Product spec: `/Users/kris/Documents/Projects/CleanSheets/Specs/SheetSync ProductSpec.docx`
 - UI designs: `/Users/kris/Documents/Projects/CleanSheets/Designs/`
