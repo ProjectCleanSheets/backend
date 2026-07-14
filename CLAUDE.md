@@ -13,6 +13,13 @@ The board MUST be kept up to date as the project grows:
 - Any newly discovered work gets a task file in `tasks/` and a Backlog entry (with
   Fibonacci story points) BEFORE implementation starts. No untracked work.
 
+## Git Workflow
+The owner reviews every change before it enters git history:
+- **Never commit or push yourself.** Create the task's branch, implement on it, and
+  leave ALL changes uncommitted in the working tree — the owner reviews the diff,
+  then commits and pushes himself. This includes TASKS.md board edits and doc changes.
+- Only commit/push when explicitly told to in the current session.
+
 ## Project Structure
 ```
 backend/
