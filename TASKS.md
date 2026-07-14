@@ -11,11 +11,12 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **14 pts**.
+Remaining: **16 pts**.
 
 ## In Progress
 
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · `feature/sheet-save`
+- [13 — Constants & naming cleanup](tasks/13-constants-cleanup.md) · 2 pts · `chore/constants-cleanup`
 
 ## Backlog
 

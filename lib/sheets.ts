@@ -90,8 +90,24 @@ function toSheetsError(err: unknown, fallback: SheetsError): SheetsError {
 }
 
 // Tab names in A1 notation must be single-quoted; embedded quotes are doubled.
-function a1(tab: string, range: string): string {
+function a1Range(tab: string, range: string): string {
   return `'${tab.replace(/'/g, "''")}'!${range}`;
+}
+
+const COLUMN_A_CHAR_CODE = 'A'.charCodeAt(0);
+
+/**
+ * 0-indexed column number → letter, and back. Both are bounded to single
+ * letters (A..Z) — every scan in this codebase stays within column Z, and
+ * user-configured two-letter columns are passed through as strings without
+ * ever being converted.
+ */
+export function columnLetter(index: number): string {
+  return String.fromCharCode(COLUMN_A_CHAR_CODE + index);
+}
+
+export function columnIndex(letter: string): number {
+  return letter.charCodeAt(0) - COLUMN_A_CHAR_CODE;
 }
 
 export interface TabInfo {
@@ -139,7 +155,7 @@ export async function readRange(
   try {
     const { data } = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: a1(tab, range),
+      range: a1Range(tab, range),
       valueRenderOption: 'UNFORMATTED_VALUE',
     });
     return (data.values ?? []) as CellValue[][];
@@ -162,7 +178,7 @@ export async function writeCell(
   try {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: a1(tab, cell),
+      range: a1Range(tab, cell),
       valueInputOption: 'RAW',
       requestBody: { values: [[value]] },
     });
@@ -184,7 +200,7 @@ export async function appendRow(
   try {
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: a1(tab, 'A1'),
+      range: a1Range(tab, 'A1'),
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [values] },

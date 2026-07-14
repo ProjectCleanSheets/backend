@@ -1,13 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { getVerifiedUser } from '../../lib/auth';
+import {
+  COLUMN_LETTER_PATTERN,
+  MAX_SECTION_NAME_LENGTH,
+  SHEET_ID_PATTERN,
+} from '../../lib/constants';
 import { sendError } from '../../lib/errors';
 import { getSupabase } from '../../lib/supabase';
 
 // Column mapping per section, e.g. { "Expenses": { "category_col": "F", "actual_col": "H" } }
-const columnSchema = z.string().regex(/^[A-Z]{1,2}$/, 'Column must be a letter like "F"');
+const columnSchema = z.string().regex(COLUMN_LETTER_PATTERN, 'Column must be a letter like "F"');
 const columnMappingSchema = z.record(
-  z.string().min(1).max(40),
+  z.string().min(1).max(MAX_SECTION_NAME_LENGTH),
   z.object({
     category_col: columnSchema,
     actual_col: columnSchema,
@@ -18,7 +23,7 @@ const columnMappingSchema = z.record(
 
 const configUpdateSchema = z
   .object({
-    sheetId: z.string().regex(/^[a-zA-Z0-9_-]{20,100}$/, 'Invalid Google Sheet ID'),
+    sheetId: z.string().regex(SHEET_ID_PATTERN, 'Invalid Google Sheet ID'),
     columnMapping: columnMappingSchema,
   })
   .partial()

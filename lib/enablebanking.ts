@@ -1,4 +1,5 @@
 import { createSign } from 'node:crypto';
+import { MS_PER_DAY } from './constants';
 
 // Enable Banking serves sandbox and production from the same base URL; the
 // environment is a property of the registered application (app ID + key pair).
@@ -17,6 +18,8 @@ const REDIRECT_URI =
 // allowed, so 0.01 ≈ 15 min) to test consent expiry end-to-end — production
 // must not set it. Values outside (0, 180] fall back to the default.
 const DEFAULT_CONSENT_VALIDITY_DAYS = 90;
+// Regulatory ceiling under the SCA RTS — banks reject longer consent windows.
+const MAX_CONSENT_VALIDITY_DAYS = 180;
 
 function consentValidityDays(): number {
   const raw = process.env.ENABLE_BANKING_CONSENT_DAYS;
@@ -24,12 +27,17 @@ function consentValidityDays(): number {
     return DEFAULT_CONSENT_VALIDITY_DAYS;
   }
   const days = Number(raw);
-  if (!Number.isFinite(days) || days <= 0 || days > 180) {
+  if (!Number.isFinite(days) || days <= 0 || days > MAX_CONSENT_VALIDITY_DAYS) {
     return DEFAULT_CONSENT_VALIDITY_DAYS;
   }
   return days;
 }
+
 const JWT_TTL_SECONDS = 3600;
+
+// Enough to identify the failing step in an error message without ever
+// relaying a full upstream response body.
+const ERROR_DETAIL_MAX_CHARS = 200;
 
 export interface Aspsp {
   name: string;
@@ -70,10 +78,10 @@ async function errorDetail(response: Response): Promise<string | undefined> {
     }
     const { message, detail } = body as { message?: unknown; detail?: unknown };
     if (typeof message === 'string') {
-      return message.slice(0, 200);
+      return message.slice(0, ERROR_DETAIL_MAX_CHARS);
     }
     if (typeof detail === 'string') {
-      return detail.slice(0, 200);
+      return detail.slice(0, ERROR_DETAIL_MAX_CHARS);
     }
     if (Array.isArray(detail)) {
       const reasons = detail
@@ -84,7 +92,7 @@ async function errorDetail(response: Response): Promise<string | undefined> {
         )
         .filter((reason): reason is string => reason !== null);
       if (reasons.length > 0) {
-        return reasons.join('; ').slice(0, 200);
+        return reasons.join('; ').slice(0, ERROR_DETAIL_MAX_CHARS);
       }
     }
     return undefined;
@@ -173,7 +181,7 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
  * `state` is echoed back on the callback redirect for CSRF validation.
  */
 export async function startAuthSession(state: string, aspsp: Aspsp): Promise<string> {
-  const validUntil = new Date(Date.now() + consentValidityDays() * 24 * 60 * 60 * 1000);
+  const validUntil = new Date(Date.now() + consentValidityDays() * MS_PER_DAY);
   const data = await post<{ url: string }>('/auth', {
     access: { valid_until: validUntil.toISOString() },
     aspsp,
@@ -209,7 +217,7 @@ export async function getSession(sessionId: string): Promise<SessionDetails> {
 
 // The transaction fields the backend consumes — the API returns more, but
 // nothing else is needed and unknown fields are ignored by JSON parsing.
-export interface EbTransaction {
+export interface EnableBankingTransaction {
   entry_reference?: string | null;
   transaction_id?: string | null;
   transaction_amount?: { currency?: string | null; amount?: string | null } | null;
@@ -234,12 +242,12 @@ const MAX_TRANSACTION_PAGES = 10;
 export async function fetchAccountTransactions(
   accountUid: string,
   dateFrom: string,
-): Promise<EbTransaction[]> {
+): Promise<EnableBankingTransaction[]> {
   const path = `/accounts/${encodeURIComponent(accountUid)}/transactions`;
-  const transactions: EbTransaction[] = [];
+  const transactions: EnableBankingTransaction[] = [];
   let continuationKey: string | undefined;
   for (let page = 0; page < MAX_TRANSACTION_PAGES; page++) {
-    const data = await get<{ transactions?: EbTransaction[]; continuation_key?: string | null }>(
+    const data = await get<{ transactions?: EnableBankingTransaction[]; continuation_key?: string | null }>(
       path,
       { date_from: dateFrom, ...(continuationKey ? { continuation_key: continuationKey } : {}) },
     );

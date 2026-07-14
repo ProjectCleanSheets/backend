@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getVerifiedUser } from '../../lib/auth';
+import { ISO_DATE_LENGTH, MS_PER_DAY } from '../../lib/constants';
 import { decryptToken } from '../../lib/crypto';
 import {
-  type EbTransaction,
+  type EnableBankingTransaction,
   EnableBankingError,
   fetchAccountTransactions,
   getSession,
@@ -149,10 +150,10 @@ export async function fetchUncategorized(
     );
   }
 
-  const dateFrom = new Date(Date.now() - FETCH_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const dateFrom = new Date(Date.now() - FETCH_WINDOW_DAYS * MS_PER_DAY)
     .toISOString()
-    .slice(0, 10);
-  const fetched: EbTransaction[] = [];
+    .slice(0, ISO_DATE_LENGTH);
+  const fetched: EnableBankingTransaction[] = [];
   for (const accountUid of session.accounts) {
     fetched.push(...(await fetchAccountTransactions(accountUid, dateFrom)));
   }
@@ -200,7 +201,7 @@ async function readLogMatcher(
  * so the mapping can be exercised directly; Vercel only routes the default
  * export.
  */
-export function toQueueTransaction(tx: EbTransaction): QueueTransaction | null {
+export function toQueueTransaction(tx: EnableBankingTransaction): QueueTransaction | null {
   if (tx.status !== 'BOOK' && tx.status !== 'PDNG') {
     return null;
   }

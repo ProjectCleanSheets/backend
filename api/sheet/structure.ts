@@ -1,9 +1,20 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { getVerifiedUser } from '../../lib/auth';
+import {
+  DEFAULT_ACTUAL_COLUMN,
+  DEFAULT_BUDGET_COLUMN,
+  DEFAULT_CATEGORY_COLUMN,
+  DEFAULT_LEFT_COLUMN,
+  MAX_TAB_NAME_LENGTH,
+  SHEET_ID_PATTERN,
+  SHEET_SCAN_MAX_ROWS,
+} from '../../lib/constants';
 import { sendError } from '../../lib/errors';
 import {
   type CellValue,
+  columnIndex,
+  columnLetter,
   getSheetsForUser,
   listTabs,
   readRange,
@@ -15,23 +26,37 @@ import {
 // sheet is opened with the caller's own stored token, so only sheets their
 // Google account can access will resolve.
 const querySchema = z.object({
-  sheetId: z.string().regex(/^[a-zA-Z0-9_-]{20,100}$/, 'Invalid Google Sheet ID'),
-  tab: z.string().min(1).max(100).optional(),
+  sheetId: z.string().regex(SHEET_ID_PATTERN, 'Invalid Google Sheet ID'),
+  tab: z.string().min(1).max(MAX_TAB_NAME_LENGTH).optional(),
 });
 
 // Budget dashboards are small; one bounded read covers the whole layout and
-// keeps the scan to a single Sheets API call.
-const SCAN_RANGE = 'A1:Z300';
+// keeps the scan to a single Sheets API call. Column Z also bounds every
+// index→letter conversion to a single letter.
+const SCAN_LAST_COLUMN = 'Z';
+const SCAN_RANGE = `A1:${SCAN_LAST_COLUMN}${SHEET_SCAN_MAX_ROWS}`;
 
 // Section names the onboarding flow offers (product spec). Used only as a
 // fallback when the tab has no Budget/Actual header rows.
 const KNOWN_SECTIONS = ['expenses', 'bills', 'income', 'save & invest', 'liabilities'];
 
-// Default layout per CLAUDE.md: F=category, G=Budget, H=Actual, I=Left.
-const DEFAULT_CATEGORY_COL = 5; // 0-indexed "F"
+// Default layout per CLAUDE.md, as 0-indexed scan columns.
+const DEFAULT_CATEGORY_COL = columnIndex(DEFAULT_CATEGORY_COLUMN);
+const DEFAULT_BUDGET_COL = columnIndex(DEFAULT_BUDGET_COLUMN);
+const DEFAULT_ACTUAL_COL = columnIndex(DEFAULT_ACTUAL_COLUMN);
+const DEFAULT_LEFT_COL = columnIndex(DEFAULT_LEFT_COLUMN);
 
 const MAX_SECTIONS = 20;
 const MAX_CATEGORIES_PER_SECTION = 100;
+
+// How far a section box's parts may sit apart. Headers: an extra column (like
+// Bills' "Due") can push "Actual" away from "Budget", and "Left" is optional.
+// Titles: a merged banner surfaces its value up to a few cells above/left of
+// the Budget/Actual header pair (see findTitle).
+const MAX_COLS_FROM_BUDGET_TO_ACTUAL = 3;
+const MAX_COLS_FROM_ACTUAL_TO_LEFT = 2;
+const TITLE_MAX_ROWS_ABOVE = 3;
+const TITLE_MAX_COLS_LEFT = 3;
 
 interface HeaderPair {
   rowIndex: number;
@@ -97,11 +122,6 @@ function numberOrNull(cell: CellValue | undefined): number | null {
   return typeof cell === 'number' && Number.isFinite(cell) ? cell : null;
 }
 
-// The scan range is bounded to columns A..Z, so one letter is always enough.
-function columnLetter(index: number): string {
-  return String.fromCharCode(65 + index);
-}
-
 /**
  * Finds every "Budget" → "Actual" (optionally "Left") header pair in a row.
  * Dashboards place section boxes side by side, so one row can hold several
@@ -109,14 +129,14 @@ function columnLetter(index: number): string {
  */
 function findPairsInRow(row: CellValue[]): { budgetCol: number; actualCol: number; leftCol: number | null }[] {
   const pairs: { budgetCol: number; actualCol: number; leftCol: number | null }[] = [];
-  for (let col = 0; col < row.length; col++) {
-    if (!/^budget$/i.test(cellText(row[col]))) {
+  for (let budgetCol = 0; budgetCol < row.length; budgetCol++) {
+    if (!/^budget$/i.test(cellText(row[budgetCol]))) {
       continue;
     }
     let actualCol = -1;
-    for (let c = col + 1; c <= col + 3; c++) {
-      if (/^actual$/i.test(cellText(row[c]))) {
-        actualCol = c;
+    for (let candidate = budgetCol + 1; candidate <= budgetCol + MAX_COLS_FROM_BUDGET_TO_ACTUAL; candidate++) {
+      if (/^actual$/i.test(cellText(row[candidate]))) {
+        actualCol = candidate;
         break;
       }
     }
@@ -124,14 +144,14 @@ function findPairsInRow(row: CellValue[]): { budgetCol: number; actualCol: numbe
       continue;
     }
     let leftCol: number | null = null;
-    for (let c = actualCol + 1; c <= actualCol + 2; c++) {
-      if (/^left$/i.test(cellText(row[c]))) {
-        leftCol = c;
+    for (let candidate = actualCol + 1; candidate <= actualCol + MAX_COLS_FROM_ACTUAL_TO_LEFT; candidate++) {
+      if (/^left$/i.test(cellText(row[candidate]))) {
+        leftCol = candidate;
         break;
       }
     }
-    pairs.push({ budgetCol: col, actualCol, leftCol });
-    col = leftCol ?? actualCol; // resume scanning after this pair
+    pairs.push({ budgetCol, actualCol, leftCol });
+    budgetCol = leftCol ?? actualCol; // resume scanning after this pair
   }
   return pairs;
 }
@@ -149,12 +169,12 @@ function findTitle(
   rowIndex: number,
   budgetCol: number,
 ): { name: string; categoryCol: number; titleRowIndex: number } | null {
-  for (let r = rowIndex; r >= Math.max(0, rowIndex - 3); r--) {
-    const row = grid[r] ?? [];
-    for (let c = budgetCol - 1; c >= Math.max(0, budgetCol - 3); c--) {
-      const text = cellText(row[c]);
+  for (let titleRow = rowIndex; titleRow >= Math.max(0, rowIndex - TITLE_MAX_ROWS_ABOVE); titleRow--) {
+    const row = grid[titleRow] ?? [];
+    for (let titleCol = budgetCol - 1; titleCol >= Math.max(0, budgetCol - TITLE_MAX_COLS_LEFT); titleCol--) {
+      const text = cellText(row[titleCol]);
       if (text && !HEADER_LABEL.test(text)) {
-        return { name: text, categoryCol: c, titleRowIndex: r };
+        return { name: text, categoryCol: titleCol, titleRowIndex: titleRow };
       }
     }
   }
@@ -172,9 +192,9 @@ function detectKnownNameRows(grid: CellValue[][]): HeaderPair[] {
         rowIndex,
         name,
         categoryCol: DEFAULT_CATEGORY_COL,
-        budgetCol: DEFAULT_CATEGORY_COL + 1,
-        actualCol: DEFAULT_CATEGORY_COL + 2,
-        leftCol: DEFAULT_CATEGORY_COL + 3,
+        budgetCol: DEFAULT_BUDGET_COL,
+        actualCol: DEFAULT_ACTUAL_COL,
+        leftCol: DEFAULT_LEFT_COL,
       });
     }
   });

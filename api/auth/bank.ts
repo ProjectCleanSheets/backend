@@ -14,10 +14,13 @@ import { getSupabase } from '../../lib/supabase';
 // Deep link the iOS app's ASWebAuthenticationSession listens on.
 const APP_CALLBACK = 'cleansheets://oauth/bank';
 
+// Generous cap for ASPSP names as listed by Enable Banking.
+const MAX_BANK_NAME_LENGTH = 100;
+
 // Bank selection: optional in sandbox (defaults to Mock ASPSP), required in
 // production where the app passes the user's bank.
 const startQuerySchema = z.object({
-  bank: z.string().min(1).max(100).optional(),
+  bank: z.string().min(1).max(MAX_BANK_NAME_LENGTH).optional(),
   country: z
     .string()
     .regex(/^[A-Z]{2}$/, 'country must be a two-letter ISO code like "DK"')

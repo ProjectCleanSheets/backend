@@ -41,9 +41,13 @@ export async function getVerifiedUser(req: VercelRequest): Promise<AuthedUser | 
 // user who initiated it (CSRF protection). Key is derived from ENCRYPTION_KEY so
 // no extra secret is needed.
 const STATE_TTL_SECONDS = 600;
+// 256-bit key, matching the HMAC-SHA256 block recommendation.
+const STATE_HMAC_KEY_BYTES = 32;
 
 function stateHmacKey(): Buffer {
-  return Buffer.from(hkdfSync('sha256', loadEncryptionKey(), '', 'cleansheets-oauth-state', 32));
+  return Buffer.from(
+    hkdfSync('sha256', loadEncryptionKey(), '', 'cleansheets-oauth-state', STATE_HMAC_KEY_BYTES),
+  );
 }
 
 function sign(payload: string): string {

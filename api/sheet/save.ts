@@ -1,6 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { getVerifiedUser } from '../../lib/auth';
+import {
+  AMOUNT_DECIMALS,
+  COLUMN_LETTER_PATTERN,
+  DEFAULT_ACTUAL_COLUMN,
+  DEFAULT_CATEGORY_COLUMN,
+  ISO_DATE_PATTERN,
+  MAX_CATEGORY_NAME_LENGTH,
+  MAX_SECTION_NAME_LENGTH,
+  MAX_TRANSACTION_AMOUNT,
+  MAX_TRANSACTION_ID_LENGTH,
+  SHEET_SCAN_MAX_ROWS,
+} from '../../lib/constants';
 import { type ErrorCode, sendError } from '../../lib/errors';
 import {
   buildLogMatcher,
@@ -25,31 +37,20 @@ import {
 } from '../../lib/sheets';
 import { getSupabase } from '../../lib/supabase';
 
-// CLAUDE.md defaults, used when the section has no stored column mapping.
-const DEFAULT_CATEGORY_COL = 'F';
-const DEFAULT_ACTUAL_COL = 'H';
-
-// Matches the scan depth of sheet structure detection.
-const COLUMN_SCAN_ROWS = 300;
-
-// Sane bound for a single budget transaction; sign allowed so a refund can
-// reduce the Actual total.
-const MAX_AMOUNT = 1_000_000;
-
 // `date` and `status` describe the queue entry being saved: together with
 // transactionId and amount they form the composite dedup key (banks reuse one
 // id across split transaction lines — see lib/logtab.ts).
 const saveSchema = z.object({
-  section: z.string().trim().min(1).max(40),
-  category: z.string().trim().min(1).max(100),
-  amount: z.number().finite().gte(-MAX_AMOUNT).lte(MAX_AMOUNT),
-  transactionId: z.string().trim().min(1).max(100),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD'),
+  section: z.string().trim().min(1).max(MAX_SECTION_NAME_LENGTH),
+  category: z.string().trim().min(1).max(MAX_CATEGORY_NAME_LENGTH),
+  amount: z.number().finite().gte(-MAX_TRANSACTION_AMOUNT).lte(MAX_TRANSACTION_AMOUNT),
+  transactionId: z.string().trim().min(1).max(MAX_TRANSACTION_ID_LENGTH),
+  date: z.string().regex(ISO_DATE_PATTERN, 'date must be YYYY-MM-DD'),
   status: z.enum(['booked', 'pending']),
 });
 
 const undoSchema = z.object({
-  transactionId: z.string().trim().min(1).max(100),
+  transactionId: z.string().trim().min(1).max(MAX_TRANSACTION_ID_LENGTH),
 });
 
 // Carries the exact status + code for failures the endpoint detects itself,
@@ -137,7 +138,7 @@ async function handleSave(googleId: string, req: VercelRequest, res: VercelRespo
     status,
     new Date().toISOString(),
   ]);
-  const newActual = round2(target.currentActual + amount);
+  const newActual = roundAmount(target.currentActual + amount);
   await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
 
   res.status(200).json({ tab: monthTab, row: target.row, cell: target.cell, newActual });
@@ -179,7 +180,7 @@ async function handleUndo(googleId: string, req: VercelRequest, res: VercelRespo
   // reverse the Actual cell first, then drop the log row.
   const monthTab = findMonthTab(tabs);
   const target = await locateActualCell(sheets, config, monthTab, entry.section, entry.category);
-  const newActual = round2(target.currentActual - entry.amount);
+  const newActual = roundAmount(target.currentActual - entry.amount);
   await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
   await deleteRow(sheets, config.sheetId, logTab.tabId, entry.rowNumber);
 
@@ -245,7 +246,7 @@ async function locateActualCell(
     sheets,
     config.sheetId,
     monthTab,
-    `${categoryCol}1:${categoryCol}${COLUMN_SCAN_ROWS}`,
+    `${categoryCol}1:${categoryCol}${SHEET_SCAN_MAX_ROWS}`,
   );
   const row = findCategoryRow(column, section, category, otherSections);
   if (row === null) {
@@ -272,11 +273,11 @@ function resolveColumns(
   const match = Object.entries(mapping).find(([name]) => name.trim().toLowerCase() === wanted);
   const otherSections = Object.keys(mapping).filter((name) => name !== match?.[0]);
 
-  const categoryCol = match?.[1]?.category_col ?? DEFAULT_CATEGORY_COL;
-  const actualCol = match?.[1]?.actual_col ?? DEFAULT_ACTUAL_COL;
+  const categoryCol = match?.[1]?.category_col ?? DEFAULT_CATEGORY_COLUMN;
+  const actualCol = match?.[1]?.actual_col ?? DEFAULT_ACTUAL_COLUMN;
   // Mapping values were zod-validated on write; re-check before splicing into
   // an A1 range so a corrupt row can never widen a read/write.
-  if (!/^[A-Z]{1,2}$/.test(categoryCol) || !/^[A-Z]{1,2}$/.test(actualCol)) {
+  if (!COLUMN_LETTER_PATTERN.test(categoryCol) || !COLUMN_LETTER_PATTERN.test(actualCol)) {
     throw new SaveError(500, 'SUPABASE_ERROR', 'Stored column mapping is invalid');
   }
   return { categoryCol, actualCol, otherSections };
@@ -291,8 +292,10 @@ function findLastById(entries: LogEntry[], transactionId: string): LogEntry | un
   return undefined;
 }
 
-// Currency amounts: keep the read-modify-write result at 2 decimals so float
-// artifacts (195.32000000000001) never land in the sheet.
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+// Currency amounts: keep the read-modify-write result at AMOUNT_DECIMALS so
+// float artifacts (195.32000000000001) never land in the sheet.
+const AMOUNT_ROUNDING_FACTOR = 10 ** AMOUNT_DECIMALS;
+
+function roundAmount(value: number): number {
+  return Math.round(value * AMOUNT_ROUNDING_FACTOR) / AMOUNT_ROUNDING_FACTOR;
 }

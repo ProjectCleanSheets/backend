@@ -1,4 +1,5 @@
-import type { CellValue } from './sheets';
+import { AMOUNT_DECIMALS } from './constants';
+import { type CellValue, columnLetter } from './sheets';
 
 // The hidden `_log` tab is the dedup source of truth (product spec §7b): one
 // row per saved transaction. The save endpoint and the transaction-queue
@@ -19,7 +20,12 @@ export const LOG_HEADER = [
   'savedAt',
 ] as const;
 
-export const LOG_RANGE = 'A1:G10000';
+// Read depth: comfortably above what a single user saves in years of use,
+// while keeping the response a single bounded fetch.
+const LOG_MAX_ROWS = 10_000;
+
+// The full log grid, one column per LOG_HEADER field.
+export const LOG_RANGE = `A1:${columnLetter(LOG_HEADER.length - 1)}${LOG_MAX_ROWS}`;
 
 export interface LogEntry {
   rowNumber: number; // 1-based sheet row
@@ -31,7 +37,7 @@ export interface LogEntry {
   status: string;
 }
 
-function text(cell: CellValue | undefined): string {
+function cellText(cell: CellValue | undefined): string {
   if (typeof cell === 'string') {
     return cell.trim();
   }
@@ -46,7 +52,7 @@ function text(cell: CellValue | undefined): string {
 export function parseLogRows(rows: CellValue[][]): LogEntry[] {
   const entries: LogEntry[] = [];
   rows.forEach((row, index) => {
-    const transactionId = text(row[0]);
+    const transactionId = cellText(row[0]);
     // A bank id can never equal the literal header label.
     if (!transactionId || transactionId === LOG_HEADER[0]) {
       return;
@@ -54,11 +60,11 @@ export function parseLogRows(rows: CellValue[][]): LogEntry[] {
     entries.push({
       rowNumber: index + 1,
       transactionId,
-      section: text(row[1]),
-      category: text(row[2]),
+      section: cellText(row[1]),
+      category: cellText(row[2]),
       amount: typeof row[3] === 'number' && Number.isFinite(row[3]) ? row[3] : null,
-      date: text(row[4]),
-      status: text(row[5]).toLowerCase(),
+      date: cellText(row[4]),
+      status: cellText(row[5]).toLowerCase(),
     });
   });
   return entries;
@@ -90,5 +96,5 @@ export function buildLogMatcher(
 
 // NUL separator: cannot occur inside an id, amount, or date.
 function tripleKey(id: string, amount: number, date: string): string {
-  return `${id}\u0000${Math.abs(amount).toFixed(2)}\u0000${date}`;
+  return `${id}\u0000${Math.abs(amount).toFixed(AMOUNT_DECIMALS)}\u0000${date}`;
 }
