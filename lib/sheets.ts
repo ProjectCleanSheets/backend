@@ -94,19 +94,34 @@ function a1(tab: string, range: string): string {
   return `'${tab.replace(/'/g, "''")}'!${range}`;
 }
 
-/** Lists the spreadsheet's tab titles in sheet order. */
-export async function listTabs(sheets: Sheets, spreadsheetId: string): Promise<string[]> {
+export interface TabInfo {
+  title: string;
+  tabId: number; // numeric sheetId, needed for row-level batchUpdate requests
+}
+
+/** Lists the spreadsheet's tabs (title + numeric id) in sheet order. */
+export async function listTabInfo(sheets: Sheets, spreadsheetId: string): Promise<TabInfo[]> {
   try {
     const { data } = await sheets.spreadsheets.get({
       spreadsheetId,
-      fields: 'sheets.properties.title',
+      fields: 'sheets.properties(title,sheetId)',
     });
-    return (data.sheets ?? [])
-      .map((sheet) => sheet.properties?.title)
-      .filter((title): title is string => typeof title === 'string');
+    const tabs: TabInfo[] = [];
+    for (const sheet of data.sheets ?? []) {
+      const { title, sheetId } = sheet.properties ?? {};
+      if (typeof title === 'string' && typeof sheetId === 'number') {
+        tabs.push({ title, tabId: sheetId });
+      }
+    }
+    return tabs;
   } catch (err) {
     throw toSheetsError(err, new SheetsError('SHEET_NOT_FOUND', 'Could not open the spreadsheet'));
   }
+}
+
+/** Lists the spreadsheet's tab titles in sheet order. */
+export async function listTabs(sheets: Sheets, spreadsheetId: string): Promise<string[]> {
+  return (await listTabInfo(sheets, spreadsheetId)).map((tab) => tab.title);
 }
 
 /**
@@ -154,4 +169,137 @@ export async function writeCell(
   } catch (err) {
     throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not write to the sheet'));
   }
+}
+
+/**
+ * Appends one row after the tab's last row with data. RAW input keeps values
+ * verbatim — user-supplied text can never be interpreted as a formula.
+ */
+export async function appendRow(
+  sheets: Sheets,
+  spreadsheetId: string,
+  tab: string,
+  values: (string | number)[],
+): Promise<void> {
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: a1(tab, 'A1'),
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [values] },
+    });
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not append to the sheet'));
+  }
+}
+
+/** Creates a hidden tab (spec §7b: the `_log` audit tab) and returns its numeric id. */
+export async function addHiddenTab(
+  sheets: Sheets,
+  spreadsheetId: string,
+  title: string,
+): Promise<number> {
+  try {
+    const { data } = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title, hidden: true } } }] },
+    });
+    const tabId = data.replies?.[0]?.addSheet?.properties?.sheetId;
+    if (typeof tabId !== 'number') {
+      throw new SheetsError('SHEET_WRITE_FAILED', 'Could not create the tab');
+    }
+    return tabId;
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not create the tab'));
+  }
+}
+
+/** Deletes one row (1-based) from the tab with the given numeric id. */
+export async function deleteRow(
+  sheets: Sheets,
+  spreadsheetId: string,
+  tabId: number,
+  rowNumber: number,
+): Promise<void> {
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: tabId,
+                dimension: 'ROWS',
+                startIndex: rowNumber - 1,
+                endIndex: rowNumber,
+              },
+            },
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not update the sheet'));
+  }
+}
+
+// How many blank cells may sit between a section's banner and its first
+// category: merged banners surface their value in the top-left cell only, and
+// the Budget/Actual header row usually leaves the category column empty.
+const HEADER_GAP_ROWS = 4;
+
+function firstCellText(row: CellValue[] | undefined): string {
+  const cell = row?.[0];
+  return typeof cell === 'string' ? cell.trim() : '';
+}
+
+/**
+ * Finds the 1-based sheet row holding `category` inside the `section` box,
+ * given a single-column read of the section's category column (index 0 =
+ * row 1). Dashboards stack several boxes in one column (e.g. Bills and
+ * Liabilities both anchored in K), so the scan starts at the row whose cell
+ * equals the section name and stops at the box's end: a blank cell after
+ * categories started, a Total row, or another section's title.
+ */
+export function findCategoryRow(
+  column: CellValue[][],
+  section: string,
+  category: string,
+  otherSections: string[],
+): number | null {
+  const sectionName = section.trim().toLowerCase();
+  const target = category.trim().toLowerCase();
+  const stops = new Set(otherSections.map((name) => name.trim().toLowerCase()));
+
+  const titleIndex = column.findIndex(
+    (row) => firstCellText(row).toLowerCase() === sectionName,
+  );
+  if (titleIndex === -1) {
+    return null;
+  }
+
+  let started = false;
+  for (let i = titleIndex + 1; i < column.length; i++) {
+    const text = firstCellText(column[i]);
+    if (!text) {
+      if (started || i - titleIndex > HEADER_GAP_ROWS) {
+        break;
+      }
+      continue;
+    }
+    if (/^total\b/i.test(text)) {
+      break;
+    }
+    const lower = text.toLowerCase();
+    if (lower === sectionName || stops.has(lower)) {
+      break;
+    }
+    if (lower === target) {
+      return i + 1;
+    }
+    started = true;
+  }
+  return null;
 }

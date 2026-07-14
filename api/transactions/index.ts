@@ -8,6 +8,7 @@ import {
   getSession,
 } from '../../lib/enablebanking';
 import { type ErrorCode, sendError } from '../../lib/errors';
+import { buildLogMatcher, LOG_RANGE, LOG_TAB, parseLogRows } from '../../lib/logtab';
 import { getSheetsForUser, listTabs, readRange, SheetsError } from '../../lib/sheets';
 import { getSupabase } from '../../lib/supabase';
 
@@ -15,12 +16,6 @@ import { getSupabase } from '../../lib/supabase';
 // re-authentication; 30 days comfortably covers "transactions since I last
 // opened the app" for the MVP.
 const FETCH_WINDOW_DAYS = 30;
-
-// Dedup source of truth (product spec §7b): task 05 appends one row per saved
-// transaction with the transactionId in column A. Reading from row 1 keeps a
-// possible header row harmless — it can never equal a real transaction id.
-const LOG_TAB = '_log';
-const LOG_ID_RANGE = 'A1:A10000';
 
 interface QueueTransaction {
   id: string;
@@ -162,41 +157,37 @@ export async function fetchUncategorized(
     fetched.push(...(await fetchAccountTransactions(accountUid, dateFrom)));
   }
 
-  const { loggedIds, logTabMissing } = await readLoggedIds(googleId, data.sheet_id);
+  const { alreadySaved, logTabMissing } = await readLogMatcher(googleId, data.sheet_id);
 
   const transactions = fetched
     .map(toQueueTransaction)
-    .filter((tx): tx is QueueTransaction => tx !== null && !loggedIds.has(tx.id))
+    .filter((tx): tx is QueueTransaction => tx !== null && !alreadySaved(tx))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   return { transactions, logTabMissing };
 }
 
-// Reads the transactionIds already saved to the sheet. A missing _log tab is
-// not an error: nothing has been saved yet (or the user deleted it) — return
-// logTabMissing so the app can warn (spec §7b). The sheet is opened with the
-// caller's own stored Google consent, so ownership is enforced by access.
-async function readLoggedIds(
+// Builds the already-saved matcher from the sheet's _log tab (spec §7b; the
+// composite-key rules live in lib/logtab.ts, shared with the save endpoint).
+// A missing _log tab is not an error: nothing has been saved yet (or the user
+// deleted it) — return logTabMissing so the app can warn. The sheet is opened
+// with the caller's own stored Google consent, so ownership is enforced by
+// access.
+async function readLogMatcher(
   googleId: string,
   sheetId: string,
-): Promise<{ loggedIds: Set<string>; logTabMissing: boolean }> {
+): Promise<{
+  alreadySaved: (tx: { id: string; amount: number; date: string }) => boolean;
+  logTabMissing: boolean;
+}> {
   const sheets = await getSheetsForUser(googleId);
   const tabs = await listTabs(sheets, sheetId);
   if (!tabs.includes(LOG_TAB)) {
-    return { loggedIds: new Set(), logTabMissing: true };
+    return { alreadySaved: () => false, logTabMissing: true };
   }
 
-  const loggedIds = new Set<string>();
-  for (const row of await readRange(sheets, sheetId, LOG_TAB, LOG_ID_RANGE)) {
-    const id = row[0];
-    // UNFORMATTED_VALUE returns purely numeric ids as numbers.
-    if (typeof id === 'string' && id.trim() !== '') {
-      loggedIds.add(id.trim());
-    } else if (typeof id === 'number') {
-      loggedIds.add(String(id));
-    }
-  }
-  return { loggedIds, logTabMissing: false };
+  const entries = parseLogRows(await readRange(sheets, sheetId, LOG_TAB, LOG_RANGE));
+  return { alreadySaved: buildLogMatcher(entries), logTabMissing: false };
 }
 
 /**
