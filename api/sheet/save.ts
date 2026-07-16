@@ -2,10 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { getVerifiedUser } from '../../lib/auth';
 import {
-  AMOUNT_DECIMALS,
-  COLUMN_LETTER_PATTERN,
-  DEFAULT_ACTUAL_COLUMN,
-  DEFAULT_CATEGORY_COLUMN,
   ISO_DATE_PATTERN,
   MAX_CATEGORY_NAME_LENGTH,
   MAX_SECTION_NAME_LENGTH,
@@ -13,18 +9,19 @@ import {
   MAX_TRANSACTION_ID_LENGTH,
   SHEET_SCAN_MAX_ROWS,
 } from '../../lib/constants';
-import { type ErrorCode, sendError } from '../../lib/errors';
+import { sendError } from '../../lib/errors';
+import { LOG_RANGE, LOG_TAB, type LogEntry, parseLogRows } from '../../lib/logtab';
 import {
-  buildLogMatcher,
-  LOG_HEADER,
-  LOG_RANGE,
-  LOG_TAB,
-  type LogEntry,
-  parseLogRows,
-} from '../../lib/logtab';
+  appendLogEntry,
+  assertNotAlreadySaved,
+  findMonthTab,
+  loadSheetConfig,
+  resolveColumns,
+  roundAmount,
+  SaveFlowError,
+  type SheetConfig,
+} from '../../lib/saveflow';
 import {
-  addHiddenTab,
-  appendRow,
   deleteRow,
   findCategoryRow,
   getSheetsForUser,
@@ -32,10 +29,8 @@ import {
   readRange,
   type Sheets,
   SheetsError,
-  type TabInfo,
   writeCell,
 } from '../../lib/sheets';
-import { getSupabase } from '../../lib/supabase';
 
 // `date` and `status` describe the queue entry being saved: together with
 // transactionId and amount they form the composite dedup key (banks reuse one
@@ -53,19 +48,6 @@ const undoSchema = z.object({
   transactionId: z.string().trim().min(1).max(MAX_TRANSACTION_ID_LENGTH),
 });
 
-// Carries the exact status + code for failures the endpoint detects itself,
-// so the handler can return them as-is.
-class SaveError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: ErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'SaveError';
-  }
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
     const user = await getVerifiedUser(req);
@@ -81,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     sendError(res, 405, 'INVALID_REQUEST', 'Unsupported method');
   } catch (err) {
-    if (err instanceof SaveError) {
+    if (err instanceof SaveFlowError) {
       return sendError(res, err.status, err.code, err.message);
     }
     if (err instanceof SheetsError) {
@@ -112,32 +94,20 @@ async function handleSave(googleId: string, req: VercelRequest, res: VercelRespo
   const config = await loadSheetConfig(googleId);
   const sheets = await getSheetsForUser(googleId);
   const tabs = await listTabInfo(sheets, config.sheetId);
-  const monthTab = findMonthTab(tabs);
+  const monthTab = findMonthTab(tabs).title;
 
-  // Dedup gate: reject if the composite key already sits in _log. The hidden
-  // tab is created on the very first save (spec §7b).
-  if (tabs.some((tab) => tab.title === LOG_TAB)) {
-    const entries = parseLogRows(await readRange(sheets, config.sheetId, LOG_TAB, LOG_RANGE));
-    const alreadySaved = buildLogMatcher(entries);
-    if (alreadySaved({ id: transactionId, amount, date })) {
-      return sendError(res, 409, 'INVALID_REQUEST', 'Transaction already saved to the sheet');
-    }
-  } else {
-    await addHiddenTab(sheets, config.sheetId, LOG_TAB);
-    await appendRow(sheets, config.sheetId, LOG_TAB, [...LOG_HEADER]);
-  }
+  await assertNotAlreadySaved(sheets, config.sheetId, tabs, { id: transactionId, amount, date });
 
   const target = await locateActualCell(sheets, config, monthTab, section, category);
 
-  await appendRow(sheets, config.sheetId, LOG_TAB, [
+  await appendLogEntry(sheets, config.sheetId, {
     transactionId,
     section,
     category,
     amount,
     date,
     status,
-    new Date().toISOString(),
-  ]);
+  });
   const newActual = roundAmount(target.currentActual + amount);
   await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
 
@@ -178,54 +148,13 @@ async function handleUndo(googleId: string, req: VercelRequest, res: VercelRespo
 
   // Task order (undo is immediate, so the month tab is the one saved to):
   // reverse the Actual cell first, then drop the log row.
-  const monthTab = findMonthTab(tabs);
+  const monthTab = findMonthTab(tabs).title;
   const target = await locateActualCell(sheets, config, monthTab, entry.section, entry.category);
   const newActual = roundAmount(target.currentActual - entry.amount);
   await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
   await deleteRow(sheets, config.sheetId, logTab.tabId, entry.rowNumber);
 
   res.status(200).json({ tab: monthTab, row: target.row, cell: target.cell, newActual });
-}
-
-interface SheetConfig {
-  sheetId: string;
-  columnMapping: Record<string, { category_col?: string; actual_col?: string }>;
-}
-
-async function loadSheetConfig(googleId: string): Promise<SheetConfig> {
-  const { data, error } = await getSupabase()
-    .from('users')
-    .select('sheet_id, column_mapping')
-    .eq('google_id', googleId)
-    .maybeSingle();
-  if (error) {
-    throw new SaveError(500, 'SUPABASE_ERROR', 'Could not load user config');
-  }
-  if (!data?.sheet_id) {
-    throw new SaveError(
-      404,
-      'SHEET_NOT_FOUND',
-      'No sheet configured — save your sheet via POST /api/user/config first',
-    );
-  }
-  const columnMapping =
-    data.column_mapping && typeof data.column_mapping === 'object' ? data.column_mapping : {};
-  return { sheetId: data.sheet_id, columnMapping };
-}
-
-// The current month tab is matched by English month name (product decision:
-// tab detection by month name, e.g. "July").
-function findMonthTab(tabs: TabInfo[]): string {
-  const monthName = new Date().toLocaleString('en-US', { month: 'long' });
-  const tab = tabs.find((t) => t.title.trim().toLowerCase() === monthName.toLowerCase());
-  if (!tab) {
-    throw new SaveError(
-      404,
-      'SHEET_NOT_FOUND',
-      `No tab found for the current month ("${monthName}")`,
-    );
-  }
-  return tab.title;
 }
 
 /**
@@ -250,7 +179,7 @@ async function locateActualCell(
   );
   const row = findCategoryRow(column, section, category, otherSections);
   if (row === null) {
-    throw new SaveError(
+    throw new SaveFlowError(
       404,
       'CATEGORY_NOT_FOUND',
       `No row for category "${category}" under section "${section}" in tab "${monthTab}"`,
@@ -265,24 +194,6 @@ async function locateActualCell(
   return { row, cell, currentActual };
 }
 
-function resolveColumns(
-  mapping: SheetConfig['columnMapping'],
-  section: string,
-): { categoryCol: string; actualCol: string; otherSections: string[] } {
-  const wanted = section.trim().toLowerCase();
-  const match = Object.entries(mapping).find(([name]) => name.trim().toLowerCase() === wanted);
-  const otherSections = Object.keys(mapping).filter((name) => name !== match?.[0]);
-
-  const categoryCol = match?.[1]?.category_col ?? DEFAULT_CATEGORY_COLUMN;
-  const actualCol = match?.[1]?.actual_col ?? DEFAULT_ACTUAL_COLUMN;
-  // Mapping values were zod-validated on write; re-check before splicing into
-  // an A1 range so a corrupt row can never widen a read/write.
-  if (!COLUMN_LETTER_PATTERN.test(categoryCol) || !COLUMN_LETTER_PATTERN.test(actualCol)) {
-    throw new SaveError(500, 'SUPABASE_ERROR', 'Stored column mapping is invalid');
-  }
-  return { categoryCol, actualCol, otherSections };
-}
-
 function findLastById(entries: LogEntry[], transactionId: string): LogEntry | undefined {
   for (let i = entries.length - 1; i >= 0; i--) {
     if (entries[i]?.transactionId === transactionId) {
@@ -290,12 +201,4 @@ function findLastById(entries: LogEntry[], transactionId: string): LogEntry | un
     }
   }
   return undefined;
-}
-
-// Currency amounts: keep the read-modify-write result at AMOUNT_DECIMALS so
-// float artifacts (195.32000000000001) never land in the sheet.
-const AMOUNT_ROUNDING_FACTOR = 10 ** AMOUNT_DECIMALS;
-
-function roundAmount(value: number): number {
-  return Math.round(value * AMOUNT_ROUNDING_FACTOR) / AMOUNT_ROUNDING_FACTOR;
 }

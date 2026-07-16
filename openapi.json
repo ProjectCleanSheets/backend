@@ -151,6 +151,61 @@
           "newActual": { "type": "number", "description": "Actual value after the write", "example": 3775.32 }
         }
       },
+      "NewCategoryRequest": {
+        "type": "object",
+        "required": ["section", "name"],
+        "properties": {
+          "section": { "type": "string", "minLength": 1, "maxLength": 40, "example": "Expenses" },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "New category name. Names the sheet scanners treat as structure (a \"Total…\" prefix, a section name) are rejected — such a row would be invisible to future saves.",
+            "example": "Streaming"
+          },
+          "budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000,
+            "description": "Optional Budget value for the new row (written to the section's Budget column)",
+            "example": 150
+          },
+          "transactionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "The queue entry's `id`. Provide together with `amount`, `date` and `status` to categorize the transaction to the new category in the same request."
+          },
+          "amount": {
+            "type": "number",
+            "minimum": -1000000,
+            "maximum": 1000000,
+            "description": "Amount written to the new row's Actual cell. Negative allowed so a refund can reduce the total.",
+            "example": 89
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "The queue entry's `date` — part of the composite dedup key",
+            "example": "2026-07-14"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["booked", "pending"],
+            "description": "The queue entry's `status` at save time — decides how the dedup key matches later (booked: id+amount+date, pending: id only)"
+          }
+        }
+      },
+      "NewCategoryResult": {
+        "type": "object",
+        "required": ["tab", "row"],
+        "properties": {
+          "tab": { "type": "string", "description": "Month tab written to", "example": "July" },
+          "row": { "type": "integer", "description": "1-based sheet row of the new category", "example": 28 },
+          "cell": { "type": "string", "description": "Actual cell written — only when a transaction was categorized", "example": "H28" },
+          "newActual": { "type": "number", "description": "Actual value after the write — only when a transaction was categorized", "example": 89 }
+        }
+      },
       "SheetStructure": {
         "type": "object",
         "required": ["tab", "sections"],
@@ -473,6 +528,69 @@
           },
           "500": {
             "description": "`SHEET_WRITE_FAILED` or `SUPABASE_ERROR`",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/sheet/category": {
+      "post": {
+        "tags": ["sheet"],
+        "summary": "Create a new category row — optionally categorize a transaction to it in one step",
+        "description": "Creates a new category in the `section` box of the current month tab by writing `name` (and the optional `budget`) into the box's first empty row — the spare formatted rows above the section's Total. Nothing is inserted or shifted, so the dashboard layout, formatting, and Total formulas are untouched; the Left column is never written to. A duplicate category name in the section is rejected with 409, as is a box with no empty row left (add one in the sheet first). When `transactionId` + `amount` + `date` + `status` are provided, the transaction is saved to the new category in the same request with the exact `/api/sheet/save` semantics: the dedup gate runs BEFORE the row is written (an already-saved transaction leaves no orphan category), and the `_log` entry is written before the Actual cell (crash-safety per product spec §7b). If the request dies after the name was written, retrying returns 409 (duplicate category) — save the transaction via POST /api/sheet/save instead.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NewCategoryRequest" },
+              "example": {
+                "section": "Expenses",
+                "name": "Streaming",
+                "budget": 150,
+                "transactionId": "abc123",
+                "amount": 89,
+                "date": "2026-07-14",
+                "status": "booked"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Created — the new row, plus the Actual cell and value when a transaction was categorized",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/NewCategoryResult" } }
+            }
+          },
+          "400": {
+            "description": "Validation failed (`INVALID_REQUEST`) — bad body, save fields not provided together, name conflicts with sheet structure, or no Budget column mapped while `budget` was given",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "`SHEET_NOT_FOUND` (no sheet configured, sheet/month tab not accessible) or `CATEGORY_NOT_FOUND` (section box not found in the tab)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "405": {
+            "description": "Unsupported method",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "409": {
+            "description": "Category already exists in the section, the section has no empty row left, or the transaction was already saved (`INVALID_REQUEST`)",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "`SHEET_WRITE_FAILED` (a write failed) or `SUPABASE_ERROR`",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }

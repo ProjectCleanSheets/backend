@@ -271,22 +271,32 @@ function firstCellText(row: CellValue[] | undefined): string {
   return typeof cell === 'string' ? cell.trim() : '';
 }
 
+export interface SectionScan {
+  /** The box's category rows (1-based, cell text trimmed) in sheet order. */
+  categories: { row: number; name: string }[];
+  /**
+   * First blank row after the last category (1-based) — boxes keep spare
+   * formatted rows above their Total, so a new category is written there
+   * without moving anything. Null when the box has no free row (Total or the
+   * next box's banner sits right below the last category).
+   */
+  freeRow: number | null;
+}
+
 /**
- * Finds the 1-based sheet row holding `category` inside the `section` box,
- * given a single-column read of the section's category column (index 0 =
- * row 1). Dashboards stack several boxes in one column (e.g. Bills and
- * Liabilities both anchored in K), so the scan starts at the row whose cell
- * equals the section name and stops at the box's end: a blank cell after
- * categories started, a Total row, or another section's title.
+ * Walks the `section` box, given a single-column read of the section's
+ * category column (index 0 = row 1). Dashboards stack several boxes in one
+ * column (e.g. Bills and Liabilities both anchored in K), so the walk starts
+ * at the row whose cell equals the section name and stops at the box's end:
+ * a blank cell after categories started, a Total row, or another section's
+ * title.
  */
-export function findCategoryRow(
+export function scanSection(
   column: CellValue[][],
   section: string,
-  category: string,
   otherSections: string[],
-): number | null {
+): SectionScan | null {
   const sectionName = section.trim().toLowerCase();
-  const target = category.trim().toLowerCase();
   const stops = new Set(otherSections.map((name) => name.trim().toLowerCase()));
 
   const titleIndex = column.findIndex(
@@ -296,11 +306,16 @@ export function findCategoryRow(
     return null;
   }
 
-  let started = false;
+  const categories: SectionScan['categories'] = [];
+  let freeRow: number | null = null;
   for (let i = titleIndex + 1; i < column.length; i++) {
     const text = firstCellText(column[i]);
     if (!text) {
-      if (started || i - titleIndex > HEADER_GAP_ROWS) {
+      if (categories.length > 0) {
+        freeRow = i + 1;
+        break;
+      }
+      if (i - titleIndex > HEADER_GAP_ROWS) {
         break;
       }
       continue;
@@ -312,10 +327,25 @@ export function findCategoryRow(
     if (lower === sectionName || stops.has(lower)) {
       break;
     }
-    if (lower === target) {
-      return i + 1;
-    }
-    started = true;
+    categories.push({ row: i + 1, name: text });
   }
-  return null;
+  return { categories, freeRow };
+}
+
+/**
+ * Finds the 1-based sheet row holding `category` inside the `section` box —
+ * a name lookup over scanSection (same column read, same box bounds).
+ */
+export function findCategoryRow(
+  column: CellValue[][],
+  section: string,
+  category: string,
+  otherSections: string[],
+): number | null {
+  const scan = scanSection(column, section, otherSections);
+  if (!scan) {
+    return null;
+  }
+  const target = category.trim().toLowerCase();
+  return scan.categories.find((c) => c.name.toLowerCase() === target)?.row ?? null;
 }
