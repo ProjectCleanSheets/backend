@@ -11,15 +11,15 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **6 pts**.
+Remaining: **8 pts**.
 
 ## In Progress
 
-- (none)
+- [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · `feature/budget-overview`
 
 ## Backlog
 
-- [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · `feature/budget-overview`
+- [14 — Save flow: anchor section scan on true box titles](tasks/14-section-anchor-save.md) · 2 pts · `feature/section-anchor-save` — latent wrong-write risk found in task 07 testing; must land before the 09 production gate
 - [08 — Settings endpoints](tasks/08-settings.md) · 2 pts · `feature/settings`
 - [09 — Security review](tasks/09-security-review.md) · 2 pts · `feature/security-review` — gate before first production use
 

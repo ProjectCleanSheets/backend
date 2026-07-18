@@ -165,6 +165,29 @@ export async function readRange(
 }
 
 /**
+ * Reads several bounded ranges from one tab in a single API call (batchGet).
+ * Results come back in request order, one CellValue[][] per range, with the
+ * same UNFORMATTED_VALUE + ragged-row semantics as readRange.
+ */
+export async function readRanges(
+  sheets: Sheets,
+  spreadsheetId: string,
+  tab: string,
+  ranges: string[],
+): Promise<CellValue[][][]> {
+  try {
+    const { data } = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId,
+      ranges: ranges.map((range) => a1Range(tab, range)),
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    });
+    return (data.valueRanges ?? []).map((vr) => (vr.values ?? []) as CellValue[][]);
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_NOT_FOUND', 'Could not read the sheet tab'));
+  }
+}
+
+/**
  * Writes one literal value to one cell. RAW input keeps the value verbatim —
  * user-supplied text can never be interpreted as a formula.
  */
@@ -290,17 +313,28 @@ export interface SectionScan {
  * at the row whose cell equals the section name and stops at the box's end:
  * a blank cell after categories started, a Total row, or another section's
  * title.
+ *
+ * `valueColumn` (same tab, the section's Actual column) disambiguates the
+ * title row: summary boxes repeat section names as row LABELS with a number
+ * beside them (e.g. Cash flow's "Income" line), while a real title row never
+ * carries a number in its own value column — it sits beside blank cells
+ * (merged banner) or the "Budget"/"Actual" header text. Candidate rows with
+ * a numeric value cell are skipped. Callers without a value-column read
+ * (task 14) keep the historical first-match behavior.
  */
 export function scanSection(
   column: CellValue[][],
   section: string,
   otherSections: string[],
+  valueColumn?: CellValue[][],
 ): SectionScan | null {
   const sectionName = section.trim().toLowerCase();
   const stops = new Set(otherSections.map((name) => name.trim().toLowerCase()));
 
   const titleIndex = column.findIndex(
-    (row) => firstCellText(row).toLowerCase() === sectionName,
+    (row, i) =>
+      firstCellText(row).toLowerCase() === sectionName &&
+      !(valueColumn && typeof valueColumn[i]?.[0] === 'number'),
   );
   if (titleIndex === -1) {
     return null;

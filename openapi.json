@@ -244,6 +244,54 @@
             }
           }
         }
+      },
+      "BudgetOverview": {
+        "type": "object",
+        "required": ["tab", "sections", "totals"],
+        "properties": {
+          "tab": { "type": "string", "example": "July" },
+          "sections": {
+            "type": "array",
+            "description": "Every section in the stored column mapping that exists on this tab, in mapping order",
+            "items": {
+              "type": "object",
+              "required": ["name", "categories", "totals"],
+              "properties": {
+                "name": { "type": "string", "example": "Expenses" },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name", "budget", "actual"],
+                    "properties": {
+                      "name": { "type": "string", "example": "Groceries" },
+                      "budget": { "type": "number", "nullable": true, "example": 3100, "description": "null when the cell is blank/non-numeric or the section has no Budget column mapped" },
+                      "actual": { "type": "number", "nullable": true, "example": 3580 }
+                    }
+                  }
+                },
+                "totals": {
+                  "type": "object",
+                  "required": ["budget", "actual"],
+                  "description": "Sum of this section's categories (null cells count as 0)",
+                  "properties": {
+                    "budget": { "type": "number", "example": 7310 },
+                    "actual": { "type": "number", "example": 7405 }
+                  }
+                }
+              }
+            }
+          },
+          "totals": {
+            "type": "object",
+            "required": ["budget", "actual"],
+            "description": "Grand totals across expense sections — every mapped section except Income. Feeds the \"Spent this month\" card.",
+            "properties": {
+              "budget": { "type": "number", "example": 9560 },
+              "actual": { "type": "number", "example": 7949 }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -642,6 +690,43 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": {
             "description": "Sheet or tab not found, or not accessible to this Google account",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/sheet/budget": {
+      "get": {
+        "tags": ["sheet"],
+        "summary": "Budget overview — Budget/Actual per category with section and grand totals",
+        "description": "Reads the caller's configured sheet and returns every mapped section found on the tab, each with its categories' Budget/Actual values and section totals. The top-level `totals` sum the expense sections only (every mapped section except `Income`) — they feed the app's \"Spent this month\" card. Sections are located via the stored column mapping, so the overview lists exactly the categories a save can write to; a mapped section missing from the tab is skipped. Without `tab`, the current month's tab is used (`SHEET_NOT_FOUND` when no tab is named after the current month).",
+        "parameters": [
+          {
+            "name": "tab",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "description": "Tab name to read, e.g. \"July\". Defaults to the current month's tab."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Budget overview for the tab",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/BudgetOverview" } }
+            }
+          },
+          "400": {
+            "description": "Invalid tab parameter",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "No sheet configured yet, unknown tab, no tab for the current month, or sheet not accessible",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }
