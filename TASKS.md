@@ -11,11 +11,11 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **9 pts**.
+Remaining: **6 pts**.
 
 ## In Progress
 
-- [06 — New category](tasks/06-new-category.md) · 3 pts · `feature/new-category`
+- (none)
 
 ## Backlog
 
@@ -25,6 +25,7 @@ Remaining: **9 pts**.
 
 ## Done
 
+- [06 — New category](tasks/06-new-category.md) · 3 pts · merged 2026-07-18, verified end-to-end via /api/docs against the real July sheet: writes into the section box's free rows above the Total (no inserts/shifts — layout, Totals, formatting untouched), combined create+categorize reuses task-05 dedup/`_log`-first ordering via `lib/saveflow.ts`, undo reverses the money only (category row stays), 409 on duplicate name and on a full box; task-05 save/undo regression-tested after the refactor (old vs new `findCategoryRow` fuzzed, 50k layouts, 0 mismatches)
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · merged 2026-07-14, verified end-to-end via /api/docs against the real July sheet: save updated the Actual cell + hidden `_log` (tab auto-created), saved txn filtered from the queue, undo restored cell/`_log`/queue; composite dedup key live in both save and queue filter (booked: id+amount+date, pending: id-only); expired-consent path re-verified for real (stale task-11 consent → reconnect → 90 days)
 - [13 — Constants & naming cleanup](tasks/13-constants-cleanup.md) · 2 pts · merged 2026-07-14: shared constants in `lib/constants.ts`, single-use values named in place, renames (`EnableBankingTransaction` etc.); no contract changes, `tsc` + stub tests green
 - [11 — Configurable consent validity for dev](tasks/11-consent-validity.md) · 1 pt · merged 2026-07-12, verified end-to-end in dev with `ENABLE_BANKING_CONSENT_DAYS=0.01`: fetch 200 → `BANK_TOKEN_EXPIRED` after ~14 min → reconnect healed (both consents' `valid_until` confirmed in dev DB); unset/invalid/out-of-range values fall back to 90 days (stubbed-fetch test, 8 cases)
