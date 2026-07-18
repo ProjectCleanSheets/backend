@@ -11,11 +11,11 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **8 pts**.
+Remaining: **6 pts**.
 
 ## In Progress
 
-- [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · `feature/budget-overview`
+- (none)
 
 ## Backlog
 
@@ -25,6 +25,7 @@ Remaining: **8 pts**.
 
 ## Done
 
+- [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · merged 2026-07-18, verified via /api/docs against the real July sheet: all five mapped sections with per-category Budget/Actual plus section and grand totals (Income excluded from the spend totals); owner-confirmed July happy path incl. the Cash flow "Income" summary-row anchor trap found live and fixed (`scanSection` valueColumn disambiguator — save-flow counterpart filed as task 14); all mapped columns read in one batchGet via new `readRanges`; unknown-tab 404, June-tab and save-loop paths covered by fixture tests on the real layout
 - [06 — New category](tasks/06-new-category.md) · 3 pts · merged 2026-07-18, verified end-to-end via /api/docs against the real July sheet: writes into the section box's free rows above the Total (no inserts/shifts — layout, Totals, formatting untouched), combined create+categorize reuses task-05 dedup/`_log`-first ordering via `lib/saveflow.ts`, undo reverses the money only (category row stays), 409 on duplicate name and on a full box; task-05 save/undo regression-tested after the refactor (old vs new `findCategoryRow` fuzzed, 50k layouts, 0 mismatches)
 - [05 — Categorize & save to sheet](tasks/05-sheet-save.md) · 5 pts · merged 2026-07-14, verified end-to-end via /api/docs against the real July sheet: save updated the Actual cell + hidden `_log` (tab auto-created), saved txn filtered from the queue, undo restored cell/`_log`/queue; composite dedup key live in both save and queue filter (booked: id+amount+date, pending: id-only); expired-consent path re-verified for real (stale task-11 consent → reconnect → 90 days)
 - [13 — Constants & naming cleanup](tasks/13-constants-cleanup.md) · 2 pts · merged 2026-07-14: shared constants in `lib/constants.ts`, single-use values named in place, renames (`EnableBankingTransaction` etc.); no contract changes, `tsc` + stub tests green
