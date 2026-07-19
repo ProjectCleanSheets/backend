@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { createOAuthState, getVerifiedUser, verifyOAuthState } from '../../lib/auth';
+import { MS_PER_DAY } from '../../lib/constants';
 import { encryptToken } from '../../lib/crypto';
 import {
   defaultAspsp,
@@ -17,6 +18,10 @@ const APP_CALLBACK = 'cleansheets://oauth/bank';
 // Generous cap for ASPSP names as listed by Enable Banking.
 const MAX_BANK_NAME_LENGTH = 100;
 
+// A consent close to expiry can be renewed early from iOS Settings; inside this
+// window the app shows the renew button ("expiring"), after expiry "expired".
+const RENEW_WINDOW_DAYS = 14;
+
 // Bank selection: optional in sandbox (defaults to Mock ASPSP), required in
 // production where the app passes the user's bank.
 const startQuerySchema = z.object({
@@ -31,6 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     if (req.method === 'GET' && req.query.action === 'callback') {
       return await handleCallback(req, res);
+    }
+    if (req.method === 'GET' && req.query.action === 'status') {
+      return await handleStatus(req, res);
     }
     if (req.method === 'GET') {
       return await startConnect(req, res);
@@ -174,4 +182,51 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
   }
 
   res.redirect(302, `${APP_CALLBACK}?status=success`);
+}
+
+export interface BankStatus {
+  status: 'healthy' | 'expiring' | 'expired';
+  expiresAt: string | null;
+  renewAvailable: boolean;
+}
+
+/**
+ * Pure status computation, exported for tests. A missing consent (never
+ * connected, or no expiry stored) reports as expired — from Settings' point of
+ * view the fix is the same: (re)connect the bank.
+ */
+export function computeBankStatus(expiresAt: string | null, now: number): BankStatus {
+  const expiryMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+  if (Number.isNaN(expiryMs) || expiryMs <= now) {
+    return { status: 'expired', expiresAt, renewAvailable: true };
+  }
+  if (expiryMs - now <= RENEW_WINDOW_DAYS * MS_PER_DAY) {
+    return { status: 'expiring', expiresAt, renewAvailable: true };
+  }
+  return { status: 'healthy', expiresAt, renewAvailable: false };
+}
+
+/**
+ * GET /api/auth/bank/status (rewritten to ?action=status) — reports the bank
+ * consent's health for the iOS Settings screen.
+ */
+async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const user = await getVerifiedUser(req);
+  if (!user) {
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+  }
+
+  const { data, error } = await getSupabase()
+    .from('users')
+    .select('bank_access_token, bank_token_expiry')
+    .eq('google_id', user.googleId)
+    .maybeSingle();
+  if (error) {
+    console.error('auth/bank: reading bank status failed:', error.message);
+    return sendError(res, 500, 'SUPABASE_ERROR', 'Could not read bank connection status');
+  }
+
+  // No stored session counts the same as no expiry: the consent is unusable.
+  const expiresAt = data?.bank_access_token ? (data.bank_token_expiry as string | null) : null;
+  res.status(200).json(computeBankStatus(expiresAt, Date.now()));
 }

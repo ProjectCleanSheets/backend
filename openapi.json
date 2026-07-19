@@ -417,6 +417,44 @@
         }
       }
     },
+    "/api/auth/bank/status": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Bank consent health for the Settings screen",
+        "description": "Reports the caller's Enable Banking consent state from the stored expiry: `expired` once the expiry has passed (or no bank was ever connected — `expiresAt` is null then), `expiring` within 14 days of expiry, otherwise `healthy`. `renewAvailable` is true whenever the consent is expiring or expired, i.e. the app should offer the (re)connect button. Renewing is the normal connect flow: GET /api/auth/bank and open the returned URL.",
+        "responses": {
+          "200": {
+            "description": "Consent status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "expiresAt", "renewAvailable"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["healthy", "expiring", "expired"] },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "Consent expiry (`valid_until`); null when no bank connection is stored"
+                    },
+                    "renewAvailable": { "type": "boolean" }
+                  }
+                },
+                "example": { "status": "healthy", "expiresAt": "2026-10-12T09:30:00.000Z", "renewAvailable": false }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": {
+            "description": "Database read failed",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
     "/api/transactions": {
       "get": {
         "tags": ["transactions"],
