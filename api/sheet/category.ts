@@ -22,7 +22,7 @@ import {
 import {
   getSheetsForUser,
   listTabInfo,
-  readRange,
+  readRanges,
   scanSection,
   SheetsError,
   writeCell,
@@ -92,13 +92,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const tabs = await listTabInfo(sheets, config.sheetId);
     const monthTab = findMonthTab(tabs);
 
-    const column = await readRange(
-      sheets,
-      config.sheetId,
-      monthTab.title,
+    // Category and Actual columns in one batchGet; the Actual column keeps a
+    // summary row labeled like a section (Cash flow's "Income" line) from
+    // anchoring the scan on the wrong box (task 14).
+    const [column = [], actualColumn = []] = await readRanges(sheets, config.sheetId, monthTab.title, [
       `${columns.categoryCol}1:${columns.categoryCol}${SHEET_SCAN_MAX_ROWS}`,
-    );
-    const scan = scanSection(column, section, columns.otherSections);
+      `${columns.actualCol}1:${columns.actualCol}${SHEET_SCAN_MAX_ROWS}`,
+    ]);
+    const scan = scanSection(column, section, columns.otherSections, actualColumn);
     if (!scan) {
       return sendError(
         res,
@@ -157,11 +158,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     // Task-05 ordering: `_log` first (crash-safety), then the Actual cell.
     // The row was blank in the category column, but its Actual cell may hold
-    // a leftover value — read-modify-write like the save endpoint does.
+    // a leftover value — read-modify-write like the save endpoint does. The
+    // value comes from the batchGet above; the name/budget writes since then
+    // never touch the Actual column.
     const cell = `${columns.actualCol}${row}`;
-    const actualValue = (
-      await readRange(sheets, config.sheetId, monthTab.title, `${cell}:${cell}`)
-    )[0]?.[0];
+    const actualValue = actualColumn[row - 1]?.[0];
     const currentActual =
       typeof actualValue === 'number' && Number.isFinite(actualValue) ? actualValue : 0;
 

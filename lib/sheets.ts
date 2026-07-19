@@ -368,15 +368,17 @@ export function scanSection(
 
 /**
  * Finds the 1-based sheet row holding `category` inside the `section` box —
- * a name lookup over scanSection (same column read, same box bounds).
+ * a name lookup over scanSection (same column read, same box bounds,
+ * including the `valueColumn` title disambiguation).
  */
 export function findCategoryRow(
   column: CellValue[][],
   section: string,
   category: string,
   otherSections: string[],
+  valueColumn?: CellValue[][],
 ): number | null {
-  const scan = scanSection(column, section, otherSections);
+  const scan = scanSection(column, section, otherSections, valueColumn);
   if (!scan) {
     return null;
   }

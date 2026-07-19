@@ -27,6 +27,7 @@ import {
   getSheetsForUser,
   listTabInfo,
   readRange,
+  readRanges,
   type Sheets,
   SheetsError,
   writeCell,
@@ -171,13 +172,16 @@ async function locateActualCell(
 ): Promise<{ row: number; cell: string; currentActual: number }> {
   const { categoryCol, actualCol, otherSections } = resolveColumns(config.columnMapping, section);
 
-  const column = await readRange(
-    sheets,
-    config.sheetId,
-    monthTab,
+  // Category and Actual columns in one batchGet. The Actual column is the
+  // title disambiguator (task 14): a summary row labeled like a section —
+  // Cash flow's "Income" line — has a number beside it, a real box title
+  // never does. It also supplies the current cell value without a second
+  // read.
+  const [column = [], actualColumn = []] = await readRanges(sheets, config.sheetId, monthTab, [
     `${categoryCol}1:${categoryCol}${SHEET_SCAN_MAX_ROWS}`,
-  );
-  const row = findCategoryRow(column, section, category, otherSections);
+    `${actualCol}1:${actualCol}${SHEET_SCAN_MAX_ROWS}`,
+  ]);
+  const row = findCategoryRow(column, section, category, otherSections, actualColumn);
   if (row === null) {
     throw new SaveFlowError(
       404,
@@ -187,7 +191,7 @@ async function locateActualCell(
   }
 
   const cell = `${actualCol}${row}`;
-  const actualValue = (await readRange(sheets, config.sheetId, monthTab, `${cell}:${cell}`))[0]?.[0];
+  const actualValue = actualColumn[row - 1]?.[0];
   // A blank Actual cell counts as 0; the cells are plain manually-typed totals.
   const currentActual =
     typeof actualValue === 'number' && Number.isFinite(actualValue) ? actualValue : 0;

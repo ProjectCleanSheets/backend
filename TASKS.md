@@ -15,11 +15,10 @@ Remaining: **6 pts**.
 
 ## In Progress
 
-- (none)
+- [14 — Save flow: anchor section scan on true box titles](tasks/14-section-anchor-save.md) · 2 pts · `feature/section-anchor-save` — latent wrong-write risk found in task 07 testing; must land before the 09 production gate
 
 ## Backlog
 
-- [14 — Save flow: anchor section scan on true box titles](tasks/14-section-anchor-save.md) · 2 pts · `feature/section-anchor-save` — latent wrong-write risk found in task 07 testing; must land before the 09 production gate
 - [08 — Settings endpoints](tasks/08-settings.md) · 2 pts · `feature/settings`
 - [09 — Security review](tasks/09-security-review.md) · 2 pts · `feature/security-review` — gate before first production use
 
