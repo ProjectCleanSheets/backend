@@ -11,7 +11,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **4 pts**.
+Remaining: **2 pts**.
 
 ## In Progress
 
@@ -19,11 +19,11 @@ Remaining: **4 pts**.
 
 ## Backlog
 
-- [08 — Settings endpoints](tasks/08-settings.md) · 2 pts · `feature/settings`
 - [09 — Security review](tasks/09-security-review.md) · 2 pts · `feature/security-review` — gate before first production use
 
 ## Done
 
+- [08 — Settings endpoints](tasks/08-settings.md) · 2 pts · merged 2026-07-19, verified live via /api/docs: `GET /api/auth/bank/status` returned healthy with the real dev consent expiry (2026-10-12); expired/expiring/renewAvailable thresholds pinned by an 8-boundary-case stub test on the pure `computeBankStatus` (incl. exactly-now → expired, exactly-14-days → expiring, never-connected → expired with null expiresAt); config re-mapping (`sheetId`/`columnMapping` POST) turned out to be fully built since task 01 — verified against the criteria, no changes needed; routed via vercel.json rewrite `/api/auth/bank/status` per the existing callback pattern
 - [14 — Save flow: anchor section scan on true box titles](tasks/14-section-anchor-save.md) · 2 pts · merged 2026-07-19, verified live via /api/docs: save to Income/"Job Salary" landed in the real Income box and undo restored it (pre-fix this exact request returned CATEGORY_NOT_FOUND, and the "Invest" variant would have written into the Cash flow summary box — collision fixture pins both behaviors); regression fuzz old-vs-new `findCategoryRow` over 20k collision-free layouts, 0 mismatches; save/undo/create now make one Sheets call fewer (Actual read folded into the batchGet)
 - [07 — Budget overview](tasks/07-budget-overview.md) · 2 pts · merged 2026-07-18, verified via /api/docs against the real July sheet: all five mapped sections with per-category Budget/Actual plus section and grand totals (Income excluded from the spend totals); owner-confirmed July happy path incl. the Cash flow "Income" summary-row anchor trap found live and fixed (`scanSection` valueColumn disambiguator — save-flow counterpart filed as task 14); all mapped columns read in one batchGet via new `readRanges`; unknown-tab 404, June-tab and save-loop paths covered by fixture tests on the real layout
 - [06 — New category](tasks/06-new-category.md) · 3 pts · merged 2026-07-18, verified end-to-end via /api/docs against the real July sheet: writes into the section box's free rows above the Total (no inserts/shifts — layout, Totals, formatting untouched), combined create+categorize reuses task-05 dedup/`_log`-first ordering via `lib/saveflow.ts`, undo reverses the money only (category row stays), 409 on duplicate name and on a full box; task-05 save/undo regression-tested after the refactor (old vs new `findCategoryRow` fuzzed, 50k layouts, 0 mismatches)
