@@ -363,7 +363,7 @@
       "get": {
         "tags": ["auth"],
         "summary": "Start the Enable Banking consent flow",
-        "description": "Returns the bank authorization URL (MitID in production, instant approval at Mock ASPSP in sandbox). Open the returned URL in a browser. In sandbox `bank`/`country` default to the Mock ASPSP; in production both are required. The callback (`/auth/bank/callback`) is browser-only and not testable here.",
+        "description": "Returns the bank authorization URL (MitID in production, instant approval at Mock ASPSP in sandbox). Open the returned URL in a browser. In sandbox `bank`/`country` default to the Mock ASPSP; in production both are required. The callback (`/auth/bank/callback`) is browser-only and not testable here — it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>`, and the app completes the connection with POST /api/auth/bank/finalize.",
         "parameters": [
           {
             "name": "bank",
@@ -448,6 +448,77 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "500": {
             "description": "Database read failed",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/bank/finalize": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Finalize a bank connection under the authenticated caller",
+        "description": "Second step of the connect flow (task 15). The browser callback no longer stores the bank session; it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own Google ID token, and the session is stored under the verified caller — so a consent completed against someone else's flow can never attach to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["handle"],
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "description": "One-time handle from the callback deep link"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bank connection stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status", "expiresAt"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["connected"] },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Consent expiry (`valid_until`)"
+                    }
+                  }
+                },
+                "example": { "status": "connected", "expiresAt": "2026-10-12T09:30:00.000Z" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, or the handle expired before finalize",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": {
+            "description": "Handle belongs to a different account",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "404": {
+            "description": "Unknown or already-used handle",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "Database failure",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }

@@ -11,15 +11,16 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **2 pts**.
+Remaining: **5 pts**.
 
 ## In Progress
 
-- (none)
+- [09 — Security review](tasks/09-security-review.md) · 2 pts · `feature/security-review` — review done ([summary](tasks/09-review-summary.md)): `npm audit --omit=dev` clean, every Security Requirement verified in code. **Stays open** — production gate is blocked on (a) the one confirmed finding, fixed on task 15 (backend done, awaiting iOS), and (b) the four secret rotations (owner-only console actions, see summary). Do NOT flip `ENABLE_BANKING_ENV=production` until both clear.
+- [15 — Bank callback: bind consent to the authenticated caller](tasks/15-bank-callback-binding.md) · 3 pts · `feature/bank-callback-binding` — **backend implemented** (migration 002 `bank_pending_sessions`, one-time handle in the callback, new `POST /api/auth/bank/finalize`, `tsc` green). Blocked on the coordinated iOS change (app must call finalize) before merge/deploy — the callback no longer stores the session directly, so shipping backend-only would break the current connect flow.
 
 ## Backlog
 
-- [09 — Security review](tasks/09-security-review.md) · 2 pts · `feature/security-review` — gate before first production use
+- (none)
 
 ## Done
 
@@ -44,5 +45,11 @@ Remaining: **2 pts**.
   amount drift and rare id reissue after settlement are accepted for MVP
   (see tasks/04-transactions.md). V2: reconcile amounts / detect reissued ids.
 - Rate limiting / abuse throttling — impractical on Vercel free tier without extra infra; revisit before public launch.
+- `npm audit` dev-only advisories (task 09) — 10 advisories (undici@5.28.4,
+  smol-toml@1.5.2) are transitive deps of `@vercel/node`, a devDependency;
+  `npm audit --omit=dev` is clean and `npm ls undici --omit=dev` is empty, so
+  none reach the deployed runtime. `npm audit fix --force` would downgrade
+  `@vercel/node` to v4 (breaking). Accepted; revisit when `@vercel/node` ships a
+  patched undici.
 - Free-tier enforcement (30 transactions/month) — explicitly out of this release per CLAUDE.md.
 - Server-side push notifications — V2 per product spec.
