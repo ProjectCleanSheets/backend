@@ -1,7 +1,9 @@
-# 17 — Delete account & data (App Store requirement)
+# 18 — Delete account & data (App Store requirement)
 
 - **Branch:** `feature/account-deletion`
-- **Depends on:** 01 (users table) and [16 — Sign in with Apple](16-apple-signin.md) — build on the provider-agnostic identity (see sequencing note).
+- **Depends on:** 01 (users table), [16 — Sign in with Apple](16-apple-signin.md)
+  (provider-agnostic identity), and [17 — Google Sheets callback binding](17-google-consent-binding.md)
+  (may add a pending-grants table this endpoint must also sweep). See sequencing note.
 - **Story points:** 3
 
 > **App Store Review Guideline 5.1.1(v):** any app that supports account creation
@@ -18,7 +20,9 @@
 - Delete, for the verified caller only (never from body/query — identity comes
   from `getVerifiedUser`):
   - their `public.users` row,
-  - any `public.bank_pending_sessions` rows they initiated.
+  - any `public.bank_pending_sessions` rows they initiated,
+  - any Google pending-grant rows they initiated, if task 17 added such a table
+    (or the generalised pending-grants table, whatever shape 17 chose).
 - **Best-effort** revoke of external grants before deleting the row (failures are
   logged, non-fatal — deletion must still succeed):
   - Google refresh token → `POST https://oauth2.googleapis.com/revoke`.
@@ -32,15 +36,18 @@
 
 ## Sequencing note
 
-Do [16 — Sign in with Apple](16-apple-signin.md) **first**. It replaces the
-`google_id` primary key with the provider-agnostic identity this endpoint deletes
-against, so building 16 first means the delete filter is written once against the
-final key — not reworked afterwards.
+Do [16 — Sign in with Apple](16-apple-signin.md) and
+[17 — Google Sheets callback binding](17-google-consent-binding.md) **first**. 16
+replaces the `google_id` primary key with the provider-agnostic identity this
+endpoint deletes against, and 17 may introduce a pending-grants table this endpoint
+must also sweep — building both first means the delete is written once against the
+final schema, not reworked afterwards.
 
 ## Acceptance criteria
 
 - [ ] Authenticated delete removes the caller's `users` row and their
-      `bank_pending_sessions` rows — verified gone in the DB.
+      `bank_pending_sessions` rows (and any Google pending-grant rows from task 17)
+      — verified gone in the DB.
 - [ ] Google refresh token and bank session revocation attempted best-effort;
       a revocation failure is logged but does not fail the deletion.
 - [ ] Only the caller's own data is affected (ownership enforced on the verified
@@ -52,7 +59,8 @@ final key — not reworked afterwards.
 ## Agent kickoff prompt
 
 > Read CLAUDE.md first (esp. Security Requirements — ownership + identity from the
-> verified token only). Implement `tasks/17-account-deletion.md`: an authenticated
+> verified token only). Implement `tasks/18-account-deletion.md`: an authenticated
 > endpoint that deletes the verified caller's `users` row and their
-> `bank_pending_sessions`, best-effort-revokes their Google + bank grants, and
+> `bank_pending_sessions` (and any Google pending-grant rows from task 17),
+> best-effort-revokes their Google + bank grants, and
 > leaves their spreadsheet untouched. Update `openapi.json`. Do not exceed scope.

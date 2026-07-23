@@ -83,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
     }
 
     const parsed = querySchema.safeParse(req.query);
@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const { sheetId, tab } = parsed.data;
 
-    const sheets = await getSheetsForUser(user.googleId);
+    const sheets = await getSheetsForUser(user.userId);
 
     if (tab === undefined) {
       res.status(200).json({ tabs: await listTabs(sheets, sheetId) });

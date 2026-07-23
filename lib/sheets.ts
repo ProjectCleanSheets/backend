@@ -30,11 +30,11 @@ export class SheetsError extends Error {
  * tokens automatically; a revoked or expired grant surfaces as
  * GOOGLE_TOKEN_EXPIRED on the first API call.
  */
-export async function getSheetsForUser(googleId: string): Promise<Sheets> {
+export async function getSheetsForUser(userId: string): Promise<Sheets> {
   const { data, error } = await getSupabase()
     .from('users')
     .select('google_refresh_token')
-    .eq('google_id', googleId)
+    .eq('id', userId)
     .maybeSingle();
   if (error) {
     throw new SheetsError('SUPABASE_ERROR', 'Could not load stored Google credentials');

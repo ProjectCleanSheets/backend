@@ -35,14 +35,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
     }
 
     if (req.method === 'GET') {
-      return await getConfig(user.googleId, res);
+      return await getConfig(user.userId, res);
     }
     if (req.method === 'POST') {
-      return await updateConfig(user.googleId, req, res);
+      return await updateConfig(user.userId, req, res);
     }
     sendError(res, 405, 'INVALID_REQUEST', 'Unsupported method');
   } catch (err) {
@@ -51,11 +51,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 }
 
-async function getConfig(googleId: string, res: VercelResponse): Promise<void> {
+async function getConfig(userId: string, res: VercelResponse): Promise<void> {
   const { data, error } = await getSupabase()
     .from('users')
     .select('sheet_id, column_mapping')
-    .eq('google_id', googleId)
+    .eq('id', userId)
     .maybeSingle();
   if (error) {
     return sendError(res, 500, 'SUPABASE_ERROR', 'Could not load user config');
@@ -67,7 +67,7 @@ async function getConfig(googleId: string, res: VercelResponse): Promise<void> {
   });
 }
 
-async function updateConfig(googleId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
+async function updateConfig(userId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
   const parsed = configUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, 'INVALID_REQUEST', parsed.error.issues[0]?.message ?? 'Invalid body');
@@ -84,7 +84,7 @@ async function updateConfig(googleId: string, req: VercelRequest, res: VercelRes
   const { data, error } = await getSupabase()
     .from('users')
     .update(update)
-    .eq('google_id', googleId)
+    .eq('id', userId)
     .select('sheet_id, column_mapping')
     .single();
   if (error) {

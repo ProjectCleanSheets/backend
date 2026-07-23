@@ -4,7 +4,8 @@ let client: SupabaseClient | null = null;
 
 // Service role key: RLS is enabled on all tables, so the anon key has no access.
 // The service role bypasses RLS — every query MUST filter by the verified caller's
-// google_id (see Security Requirements in CLAUDE.md).
+// internal user id (users.id, from getVerifiedUser; see Security Requirements in
+// CLAUDE.md).
 export function getSupabase(): SupabaseClient {
   if (!client) {
     const url = process.env.SUPABASE_URL;

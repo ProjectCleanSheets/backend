@@ -64,27 +64,31 @@ Free tier enforcement is NOT implemented in this release. Skip it entirely.
 - Database: Supabase (PostgreSQL)
 - Bank data: Enable Banking (PSD2)
 - Sheet access: Google Sheets API v4
-- Auth: Google Sign-In (ID token verification on every request)
+- Auth: Sign in with Google or Apple (identity-token verification on every request)
 
 ## Authentication
-Every request from the iOS app includes `Authorization: Bearer <google_id_token>` in the header. The backend verifies this token with Google on each request to identify the user. Never trust the user ID from the request body.
+Every request from the iOS app includes `Authorization: Bearer <identity_token>` in the header — a Google ID token or an Apple identity token. The backend verifies this token (with Google, or against Apple's JWKS) on each request and maps the verified `(provider, subject)` to a stable internal `user_id` that identifies the user. Never trust the user ID from the request body.
 
 ## Security Requirements
 This backend handles financial data. Every task must satisfy these; task 09 audits them
 before production use.
 
-- **ID token verification**: verify signature via google-auth-library AND check audience
-  (`aud === GOOGLE_CLIENT_ID`) and expiry. User identity comes ONLY from the verified
-  token — never from request body/query.
+- **ID token verification**: identity is provider-agnostic (task 16). A bearer token is a
+  Google ID token (verified via google-auth-library, `aud === GOOGLE_CLIENT_ID`) or an
+  Apple identity token (RS256 against Apple's JWKS, `iss === https://appleid.apple.com`,
+  `aud === APPLE_CLIENT_ID`); both check signature and expiry. `getVerifiedUser` maps the
+  verified `(provider, subject)` to a stable internal `user_id`. User identity comes ONLY
+  from the verified token — never from request body/query.
 - **Token encryption**: AES-256-GCM (authenticated encryption) with a random IV per
   value, key from `ENCRYPTION_KEY`. Never CBC/ECB.
 - **Supabase access**: the backend uses `SUPABASE_SERVICE_ROLE_KEY` (RLS is enabled, so
   the anon key cannot access tables). The service role bypasses RLS — per-user isolation
-  is enforced in code: every query filters by the verified caller's `google_id`.
+  is enforced in code: every query filters by the verified caller's internal `user_id`
+  (`users.id`, from `getVerifiedUser`).
 - **OAuth CSRF**: both Google and Enable Banking consent flows use a `state` parameter
   bound to the user, validated on callback.
 - **Ownership**: every read/write (transactions, saves, undo, config) operates only on
-  rows and sheets belonging to the verified caller's `google_id`.
+  rows and sheets belonging to the verified caller's internal `user_id`.
 - **Input validation**: validate every request body/query with zod; reject with
   `INVALID_REQUEST`. Bound amounts to sane numeric ranges.
 - **No secret leakage**: never log tokens, PEM keys, or sheet contents. Error responses
@@ -142,6 +146,7 @@ SUPABASE_SERVICE_ROLE_KEY      — server-side only; RLS is enabled, anon key ca
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GOOGLE_REDIRECT_URI            — optional; defaults to production callback, set to localhost in Development
+APPLE_CLIENT_ID                — Sign in with Apple audience: the app's Apple client id (iOS bundle id, or Services ID for web). Apple identity tokens are accepted only when `aud` matches. Required for Apple login (task 16)
 ENABLE_BANKING_APP_ID
 ENABLE_BANKING_PRIVATE_KEY     — full PEM contents as a single env var
 ENABLE_BANKING_ENV             — "sandbox" or "production"
@@ -160,14 +165,18 @@ The project has "automatically expose new tables" disabled: every new table's
 migration MUST explicitly `grant all privileges on table ... to service_role`
 (and never to anon/authenticated).
 
-Users table keyed to Google ID. Stores:
-- `google_id` (primary key)
+Users table keyed to a provider-agnostic internal identity (task 16). Stores:
+- `id` (uuid, primary key) — the stable internal user id every query filters on
+- `auth_provider` + `provider_subject` — unique together; the login identity
+  (`google`/`apple` and that provider's `sub`). A pre-Apple Google user migrates to
+  `(google, <old google_id>)` with no data loss.
 - `sheet_id` — Google Sheet ID
 - `column_mapping` — JSON object per section (e.g. `{ "Expenses": { "category_col": "F", "actual_col": "H" } }`)
 - `bank_access_token` — encrypted
 - `bank_refresh_token` — encrypted
 - `bank_token_expiry`
-- `google_refresh_token` — encrypted
+- `google_refresh_token` — encrypted; the Google Sheets consent, decoupled from login
+  (an Apple-login user connects a Google account here; it need not match any login)
 - `created_at`, `updated_at`
 
 ## Coding Principles

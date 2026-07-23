@@ -51,10 +51,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
     }
 
-    res.status(200).json(await fetchUncategorized(user.googleId));
+    res.status(200).json(await fetchUncategorized(user.userId));
   } catch (err) {
     if (err instanceof TransactionsError) {
       return sendError(res, err.status, err.code, err.message);
@@ -107,12 +107,12 @@ function sendEnableBankingError(res: VercelResponse, err: EnableBankingError): v
 // Exported so the fetch/filter pipeline can be exercised directly; Vercel only
 // routes the default export.
 export async function fetchUncategorized(
-  googleId: string,
+  userId: string,
 ): Promise<{ transactions: QueueTransaction[]; logTabMissing: boolean }> {
   const { data, error } = await getSupabase()
     .from('users')
     .select('sheet_id, bank_access_token, bank_token_expiry')
-    .eq('google_id', googleId)
+    .eq('id', userId)
     .maybeSingle();
   if (error) {
     throw new TransactionsError(500, 'SUPABASE_ERROR', 'Could not load stored bank credentials');
@@ -158,7 +158,7 @@ export async function fetchUncategorized(
     fetched.push(...(await fetchAccountTransactions(accountUid, dateFrom)));
   }
 
-  const { alreadySaved, logTabMissing } = await readLogMatcher(googleId, data.sheet_id);
+  const { alreadySaved, logTabMissing } = await readLogMatcher(userId, data.sheet_id);
 
   const transactions = fetched
     .map(toQueueTransaction)
@@ -175,13 +175,13 @@ export async function fetchUncategorized(
 // with the caller's own stored Google consent, so ownership is enforced by
 // access.
 async function readLogMatcher(
-  googleId: string,
+  userId: string,
   sheetId: string,
 ): Promise<{
   alreadySaved: (tx: { id: string; amount: number; date: string }) => boolean;
   logTabMissing: boolean;
 }> {
-  const sheets = await getSheetsForUser(googleId);
+  const sheets = await getSheetsForUser(userId);
   const tabs = await listTabs(sheets, sheetId);
   if (!tabs.includes(LOG_TAB)) {
     return { alreadySaved: () => false, logTabMissing: true };

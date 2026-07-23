@@ -11,7 +11,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **11 pts**.
+Remaining: **6 pts**.
 
 ## In Progress
 
@@ -19,16 +19,18 @@ Remaining: **11 pts**.
 
 ## Backlog
 
-*App Store readiness (needed before submission; both are backend work spun out of
-the task 09 review + the Sign-in-with-Apple discussion). In order: 16 sets the
-provider-agnostic identity that 17 deletes against, so account deletion is written
-once against the final key.*
+*App Store / production readiness (needed before submission). In order: 16 sets the
+provider-agnostic identity; 17 re-closes the account-linking hole that 16 reopens on
+the Google-Sheets consent (16 had to drop the login==Sheets-account check); 18
+deletes against the final schema, so account deletion is written once. 17 before 18
+because 17 may add a pending-grants table 18 must also sweep.*
 
-- [16 — Sign in with Apple (backend)](tasks/16-apple-signin.md) · 8 pts · `feature/apple-signin` — Apple 4.8: offering Google login requires an equivalent privacy option. Backend half = verify Apple tokens + make identity provider-agnostic (decouples login from the Google-Sheets connection). iOS button is separate.
-- [17 — Delete account & data](tasks/17-account-deletion.md) · 3 pts · `feature/account-deletion` — Apple 5.1.1(v): in-app account+data deletion. Built on task 16's identity model. Hard submission blocker.
+- [17 — Google Sheets callback binding](tasks/17-google-consent-binding.md) · 3 pts · `feature/google-consent-binding` — security: task 16 removed the check that Sheets consent came from the login account (required for Apple login), reopening the task-09/15 account-linking vector on the Google side. Close it with the same handle/finalize pattern task 15 used for the bank. Pre-production; iOS change is separate.
+- [18 — Delete account & data](tasks/18-account-deletion.md) · 3 pts · `feature/account-deletion` — Apple 5.1.1(v): in-app account+data deletion. Built on task 16's identity model (and sweeps any pending-grants table from 17). Hard submission blocker.
 
 ## Done
 
+- [16 — Sign in with Apple (backend)](tasks/16-apple-signin.md) · 8 pts · merged 2026-07-23: provider-agnostic identity. `getVerifiedUser` now verifies a Google **or** Apple identity token (Apple: RS256 against Apple's JWKS, `iss`/`aud === APPLE_CLIENT_ID`/expiry; alg hard-pinned to RS256 — no alg-confusion, proven by a 9/9 local-keypair crypto harness incl. `alg=none` and HS256-with-pubkey rejection) and maps `(provider, subject)` → a stable internal `user_id`, auto-provisioning the row on first authenticated request. Migration 003 swaps the users PK from `google_id` to uuid `id` + unique `(auth_provider, provider_subject)`, backfills existing Google users with **no data loss**, and renames `bank_pending_sessions.initiator_google_id` → `initiator_user_id` (**applied to dev, prod pending next deploy**). Google Sheets consent decoupled from login: the callback binds the granted Google account to the state's user instead of requiring it to equal the login account (needed for Apple login) — this reopened the task-09/15 account-linking vector on the Google side, tracked as task 17. All identity-keyed queries rekeyed to `.eq('id', …)`; `openapi.json`, CLAUDE.md, `.env.example` updated (new `APPLE_CLIENT_ID` env var). Verified: owner ran POST /api/auth/google (→ uuid + `provider:"google"` + `hasConfig`), GET /api/sheet/budget, GET /api/auth/bank/status live via /api/docs; a script replayed every identity-keyed query shape + the provisioning upsert against dev (all green, migrated row's sheet/tokens intact); `tsc` green. True Apple-signed E2E comes from the iOS button (app project). Do NOT run migration 003 on prod until this branch deploys (schema+code must ship together), and prod remains gated on secret rotation.
 - [15 — Bank callback: bind consent to the authenticated caller](tasks/15-bank-callback-binding.md) · 3 pts · merged 2026-07-22, verified live via /api/docs against the sandbox Mock ASPSP: full two-step connect → `POST /api/auth/bank/finalize` stored the session under the verified caller (`{status:"connected"}`), confirmed in the dev DB (bank token set, refresh null, handle consumed = single-use; expired orphan handle correctly left dead). Migration 002 `bank_pending_sessions` (service_role only; applied to dev, **prod pending next deploy**), one-time handle minted in the callback, `tsc` green. The future iOS app must call `finalize` (tracked in the app project); no app/users today so nothing to break.
 - [09 — Security review](tasks/09-security-review.md) · 2 pts · merged 2026-07-22 ([summary](tasks/09-review-summary.md)): every Security Requirement verified in code with refs, `npm audit --omit=dev` clean (dev-only advisories accepted), public-repo history verified clean. One confirmed Medium finding (bank-callback account-binding) fixed via task 15. Its last criterion — rotating the four leaked secrets — is **deferred to the Deferred section as a hard pre-production gate** (owner, 2026-07-22); do NOT flip `ENABLE_BANKING_ENV=production` until it's done.
 - [08 — Settings endpoints](tasks/08-settings.md) · 2 pts · merged 2026-07-19, verified live via /api/docs: `GET /api/auth/bank/status` returned healthy with the real dev consent expiry (2026-10-12); expired/expiring/renewAvailable thresholds pinned by an 8-boundary-case stub test on the pure `computeBankStatus` (incl. exactly-now → expired, exactly-14-days → expiring, never-connected → expired with null expiresAt); config re-mapping (`sheetId`/`columnMapping` POST) turned out to be fully built since task 01 — verified against the criteria, no changes needed; routed via vercel.json rewrite `/api/auth/bank/status` per the existing callback pattern

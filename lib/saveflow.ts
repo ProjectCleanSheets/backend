@@ -37,11 +37,11 @@ export interface SheetConfig {
   >;
 }
 
-export async function loadSheetConfig(googleId: string): Promise<SheetConfig> {
+export async function loadSheetConfig(userId: string): Promise<SheetConfig> {
   const { data, error } = await getSupabase()
     .from('users')
     .select('sheet_id, column_mapping')
-    .eq('google_id', googleId)
+    .eq('id', userId)
     .maybeSingle();
   if (error) {
     throw new SaveFlowError(500, 'SUPABASE_ERROR', 'Could not load user config');

@@ -53,14 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
     }
 
     if (req.method === 'POST') {
-      return await handleSave(user.googleId, req, res);
+      return await handleSave(user.userId, req, res);
     }
     if (req.method === 'DELETE') {
-      return await handleUndo(user.googleId, req, res);
+      return await handleUndo(user.userId, req, res);
     }
     sendError(res, 405, 'INVALID_REQUEST', 'Unsupported method');
   } catch (err) {
@@ -85,15 +85,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
  * Actual cell (spec §7b crash-safety): if the Actual write fails, the log
  * entry blocks a retry from double-counting.
  */
-async function handleSave(googleId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleSave(userId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
   const parsed = saveSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, 'INVALID_REQUEST', parsed.error.issues[0]?.message ?? 'Invalid body');
   }
   const { section, category, amount, transactionId, date, status } = parsed.data;
 
-  const config = await loadSheetConfig(googleId);
-  const sheets = await getSheetsForUser(googleId);
+  const config = await loadSheetConfig(userId);
+  const sheets = await getSheetsForUser(userId);
   const tabs = await listTabInfo(sheets, config.sheetId);
   const monthTab = findMonthTab(tabs).title;
 
@@ -121,15 +121,15 @@ async function handleSave(googleId: string, req: VercelRequest, res: VercelRespo
  * inherent: the sheet id comes from the verified caller's own config row and
  * is opened with their own stored Google consent.
  */
-async function handleUndo(googleId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
+async function handleUndo(userId: string, req: VercelRequest, res: VercelResponse): Promise<void> {
   const parsed = undoSchema.safeParse(req.body);
   if (!parsed.success) {
     return sendError(res, 400, 'INVALID_REQUEST', parsed.error.issues[0]?.message ?? 'Invalid body');
   }
   const { transactionId } = parsed.data;
 
-  const config = await loadSheetConfig(googleId);
-  const sheets = await getSheetsForUser(googleId);
+  const config = await loadSheetConfig(userId);
+  const sheets = await getSheetsForUser(userId);
   const tabs = await listTabInfo(sheets, config.sheetId);
   const logTab = tabs.find((tab) => tab.title === LOG_TAB);
   if (!logTab) {

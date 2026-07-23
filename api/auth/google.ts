@@ -44,33 +44,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
 /**
  * POST /api/auth/google — called by the iOS app after native Google Sign-In.
- * Verifies the ID token and creates the user row if it does not exist yet.
+ * getVerifiedUser verifies the ID token and provisions the user row on first
+ * sight, so this just reports the caller's setup state.
  */
 async function signIn(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
   }
 
-  const supabase = getSupabase();
-  const { error: upsertError } = await supabase
-    .from('users')
-    .upsert({ google_id: user.googleId, updated_at: new Date().toISOString() }, { onConflict: 'google_id' });
-  if (upsertError) {
-    return sendError(res, 500, 'SUPABASE_ERROR', 'Could not create or load user');
-  }
-
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('users')
     .select('sheet_id, google_refresh_token')
-    .eq('google_id', user.googleId)
+    .eq('id', user.userId)
     .single();
   if (error) {
     return sendError(res, 500, 'SUPABASE_ERROR', 'Could not load user');
   }
 
   res.status(200).json({
-    googleId: user.googleId,
+    userId: user.userId,
+    provider: user.provider,
     hasConfig: data.sheet_id !== null,
     hasSheetsAccess: data.google_refresh_token !== null,
   });
@@ -84,14 +78,14 @@ async function signIn(req: VercelRequest, res: VercelResponse): Promise<void> {
 async function startOAuth(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
   }
 
   const url = oauthClient().generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent', // force a refresh token even on repeat consent
     scope: OAUTH_SCOPES,
-    state: createOAuthState(user.googleId),
+    state: createOAuthState(user.userId),
     login_hint: user.email,
   });
   res.status(200).json({ url });
@@ -99,8 +93,13 @@ async function startOAuth(req: VercelRequest, res: VercelResponse): Promise<void
 
 /**
  * GET /auth/google/callback (rewritten to ?action=callback) — browser redirect
- * from Google. Validates state (CSRF), exchanges the code, verifies the granting
- * account matches the user who initiated, stores the encrypted refresh token.
+ * from Google. Validates state (CSRF), exchanges the code, and stores the
+ * encrypted refresh token on the user who started the flow.
+ *
+ * Identity is provider-agnostic (task 16): a user (Google OR Apple login) may
+ * connect any Google account for Sheets access, so the granting account need not
+ * equal the login account. The account is bound via the signed `state` — the
+ * same CSRF-bound-to-initiator model the flow already used.
  */
 async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<void> {
   const { code, state, error: consentError } = req.query;
@@ -112,24 +111,14 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
     return sendError(res, 400, 'INVALID_REQUEST', 'Missing code or state');
   }
 
-  const googleId = verifyOAuthState(state);
-  if (!googleId) {
+  const userId = verifyOAuthState(state);
+  if (!userId) {
     return sendError(res, 400, 'INVALID_REQUEST', 'Invalid or expired state');
   }
 
-  const client = oauthClient();
-  const { tokens } = await client.getToken(code);
-  if (!tokens.id_token || !tokens.refresh_token) {
-    return sendError(res, 400, 'INVALID_REQUEST', 'Google did not return the expected tokens');
-  }
-
-  // The account that granted consent must be the account that started the flow.
-  const ticket = await client.verifyIdToken({
-    idToken: tokens.id_token,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-  if (ticket.getPayload()?.sub !== googleId) {
-    return sendError(res, 400, 'INVALID_REQUEST', 'Consent granted by a different account');
+  const { tokens } = await oauthClient().getToken(code);
+  if (!tokens.refresh_token) {
+    return sendError(res, 400, 'INVALID_REQUEST', 'Google did not return a refresh token');
   }
 
   const { error } = await getSupabase()
@@ -138,7 +127,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
       google_refresh_token: encryptToken(tokens.refresh_token),
       updated_at: new Date().toISOString(),
     })
-    .eq('google_id', googleId);
+    .eq('id', userId);
   if (error) {
     return sendError(res, 500, 'SUPABASE_ERROR', 'Could not store Google credentials');
   }

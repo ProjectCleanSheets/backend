@@ -118,7 +118,7 @@ function sendEnableBankingError(res: VercelResponse, err: EnableBankingError): v
 async function startConnect(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
   }
 
   const parsed = startQuerySchema.safeParse(req.query);
@@ -138,7 +138,7 @@ async function startConnect(req: VercelRequest, res: VercelResponse): Promise<vo
     );
   }
 
-  const url = await startAuthSession(createOAuthState(user.googleId), { name, country });
+  const url = await startAuthSession(createOAuthState(user.userId), { name, country });
   res.status(200).json({ url });
 }
 
@@ -162,8 +162,8 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
     return sendError(res, 400, 'INVALID_REQUEST', 'Missing code or state');
   }
 
-  const googleId = verifyOAuthState(state);
-  if (!googleId) {
+  const userId = verifyOAuthState(state);
+  if (!userId) {
     return sendError(
       res,
       400,
@@ -184,7 +184,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
     handle,
     session_ciphertext: encryptToken(session.sessionId),
     valid_until: session.validUntil,
-    initiator_google_id: googleId,
+    initiator_user_id: userId,
     expires_at: new Date(Date.now() + HANDLE_TTL_MS).toISOString(),
   });
   if (error) {
@@ -207,7 +207,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
 async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
   }
 
   const parsed = finalizeSchema.safeParse(req.body);
@@ -219,7 +219,7 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
   const supabase = getSupabase();
   const { data: pending, error: readError } = await supabase
     .from('bank_pending_sessions')
-    .select('session_ciphertext, valid_until, initiator_google_id, expires_at')
+    .select('session_ciphertext, valid_until, initiator_user_id, expires_at')
     .eq('handle', handle)
     .maybeSingle();
   if (readError) {
@@ -250,7 +250,7 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
   // Only the account that initiated the flow may finalize it. Blocks the reverse
   // account-linking direction (a handle delivered to another device attaching a
   // stranger's bank to this caller), independent of how the app handles deep links.
-  if (pending.initiator_google_id !== user.googleId) {
+  if (pending.initiator_user_id !== user.userId) {
     return sendError(res, 403, 'INVALID_REQUEST', 'This bank authorization belongs to a different account');
   }
 
@@ -264,8 +264,8 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
       bank_token_expiry: pending.valid_until,
       updated_at: new Date().toISOString(),
     })
-    .eq('google_id', user.googleId)
-    .select('google_id')
+    .eq('id', user.userId)
+    .select('id')
     .single();
   if (updateError) {
     // PGRST116 = zero rows matched: the user row was never created (no sign-in).
@@ -313,13 +313,13 @@ export function computeBankStatus(expiresAt: string | null, now: number): BankSt
 async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
   }
 
   const { data, error } = await getSupabase()
     .from('users')
     .select('bank_access_token, bank_token_expiry')
-    .eq('google_id', user.googleId)
+    .eq('id', user.userId)
     .maybeSingle();
   if (error) {
     console.error('auth/bank: reading bank status failed:', error.message);

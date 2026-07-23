@@ -1,7 +1,7 @@
 # 16 — Sign in with Apple (backend: provider-agnostic identity)
 
 - **Branch:** `feature/apple-signin`
-- **Depends on:** 01 (auth foundation + users table). **Precedes** [17 — Delete account & data](17-account-deletion.md) — account deletion builds on the identity model this task establishes.
+- **Depends on:** 01 (auth foundation + users table). **Precedes** [17 — Google Sheets callback binding](17-google-consent-binding.md) and [18 — Delete account & data](18-account-deletion.md) — 17 closes an account-linking hole this task reopens (removing the login==Sheets-account check), and 18 builds on the identity model this task establishes.
 - **Story points:** 8
 - **Backend portion only** — the iOS "Sign in with Apple" button and its wiring
   are separate app work, tracked in the app project.

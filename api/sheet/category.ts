@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid Google ID token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
     }
     if (req.method !== 'POST') {
       return sendError(res, 405, 'INVALID_REQUEST', 'Unsupported method');
@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const { section, name, budget, transactionId } = parsed.data;
 
-    const config = await loadSheetConfig(user.googleId);
+    const config = await loadSheetConfig(user.userId);
     const columns = resolveColumns(config.columnMapping, section);
     if (budget !== undefined && columns.budgetCol === null) {
       return sendError(res, 400, 'INVALID_REQUEST', 'No Budget column mapped for this section');
@@ -88,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return sendError(res, 400, 'INVALID_REQUEST', 'Category name conflicts with the sheet structure');
     }
 
-    const sheets = await getSheetsForUser(user.googleId);
+    const sheets = await getSheetsForUser(user.userId);
     const tabs = await listTabInfo(sheets, config.sheetId);
     const monthTab = findMonthTab(tabs);
 

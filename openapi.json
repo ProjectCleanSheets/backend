@@ -3,7 +3,7 @@
   "info": {
     "title": "CleanSheets Backend",
     "version": "1.0.0",
-    "description": "Bridge between the CleanSheets iOS app, Google Sheets, Enable Banking, and Supabase. All endpoints require `Authorization: Bearer <google_id_token>` unless noted. Sign in with Google at the top of this page to auto-authorize Try-it-out requests."
+    "description": "Bridge between the CleanSheets iOS app, Google Sheets, Enable Banking, and Supabase. All endpoints require `Authorization: Bearer <identity_token>` — a Google **or** Apple identity token — unless noted; identity is resolved to a stable internal user regardless of provider. Sign in with Google at the top of this page to auto-authorize Try-it-out requests (the button mints Google tokens; an Apple token can be pasted into the Authorize dialog)."
   },
   "servers": [
     { "url": "/", "description": "This deployment" }
@@ -14,7 +14,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Google ID token issued for the CleanSheets client ID"
+        "description": "Identity token — a Google ID token (audience = GOOGLE_CLIENT_ID) or an Apple identity token (audience = APPLE_CLIENT_ID). Verified and mapped to a stable internal user id."
       }
     },
     "schemas": {
@@ -296,7 +296,7 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "Missing or invalid Google ID token",
+        "description": "Missing or invalid identity token (Google or Apple)",
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
         }
@@ -308,7 +308,8 @@
     "/api/auth/google": {
       "post": {
         "tags": ["auth"],
-        "summary": "Sign in — verify ID token and create the user row if missing",
+        "summary": "Sign in with Google — verify the ID token and provision the user row if missing",
+        "description": "Confirms a Google login and reports the caller's setup state. The user row is provisioned on the first authenticated request (any endpoint), so Apple-login clients do not need a separate sign-in call.",
         "responses": {
           "200": {
             "description": "Signed in",
@@ -317,7 +318,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "googleId": { "type": "string" },
+                    "userId": { "type": "string", "description": "Stable internal user id (uuid)" },
+                    "provider": { "type": "string", "enum": ["google", "apple"], "description": "Login provider of the verified token" },
                     "hasConfig": { "type": "boolean", "description": "true when a sheet_id is saved" },
                     "hasSheetsAccess": { "type": "boolean", "description": "true when a Sheets-scope refresh token is stored" }
                   }
@@ -459,7 +461,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Finalize a bank connection under the authenticated caller",
-        "description": "Second step of the connect flow (task 15). The browser callback no longer stores the bank session; it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own Google ID token, and the session is stored under the verified caller — so a consent completed against someone else's flow can never attach to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
+        "description": "Second step of the connect flow (task 15). The browser callback no longer stores the bank session; it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own identity token (Google or Apple), and the session is stored under the verified caller — so a consent completed against someone else's flow can never attach to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
         "requestBody": {
           "required": true,
           "content": {
