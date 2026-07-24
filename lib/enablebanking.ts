@@ -161,6 +161,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function del(path: string): Promise<void> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${signApiJwt()}` },
+  });
+  if (!response.ok) {
+    throw new EnableBankingError(response.status, path, await errorDetail(response));
+  }
+}
+
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
   for (const [key, value] of Object.entries(params ?? {})) {
@@ -205,6 +215,18 @@ export async function exchangeCode(code: string): Promise<BankSession> {
 export interface SessionDetails {
   status: string;
   accounts: string[];
+}
+
+/**
+ * Revokes a bank session (DELETE /sessions/{id}). Used best-effort on account
+ * deletion (task 18) to close the consent at Enable Banking rather than let it
+ * lapse at valid_until. There is no refresh token to revoke — the session_id is
+ * the only credential — so removing the session is the whole revocation. Throws
+ * EnableBankingError on a non-2xx (e.g. an already-expired/unknown session),
+ * which the caller logs and ignores.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  await del(`/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 /** Fetches the session's status and the account uids it grants access to. */

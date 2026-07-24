@@ -962,6 +962,45 @@
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
       }
+    },
+    "/api/user/account": {
+      "delete": {
+        "tags": ["user"],
+        "summary": "Delete the caller's account and all backend-stored data",
+        "description": "Permanently deletes everything CleanSheets stores for the verified caller: their `users` row (config + encrypted Google/bank tokens) and any in-flight pending grants (`bank_pending_sessions`, `google_pending_grants`) they started. Before deleting, it best-effort-revokes the external grants — the Google refresh token (`POST https://oauth2.googleapis.com/revoke`) and the Enable Banking session (`DELETE /sessions/{id}`); a revocation failure is logged but does not fail the deletion. Identity comes only from the verified token, so only the caller's own data is affected. **The user's Google Sheet (including its `_log` tab) is deliberately left untouched — it is their own document.** Idempotent: deleting an already-deleted account returns 200. Implements App Store Review Guideline 5.1.1(v) (in-app account deletion).",
+        "responses": {
+          "200": {
+            "description": "Account and backend data deleted (idempotent)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": { "type": "boolean", "example": true },
+                    "note": {
+                      "type": "string",
+                      "description": "Confirms the user's Google Sheet was left untouched."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": {
+            "description": "Unsupported method",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "`SUPABASE_ERROR` — deleting the stored data failed",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
     }
   }
 }
