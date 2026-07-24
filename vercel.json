@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/auth/google/callback", "destination": "/api/auth/google?action=callback" },
+    { "source": "/api/auth/google/finalize", "destination": "/api/auth/google?action=finalize" },
     { "source": "/auth/bank/callback", "destination": "/api/auth/bank?action=callback" },
     { "source": "/api/auth/bank/status", "destination": "/api/auth/bank?action=status" },
     { "source": "/api/auth/bank/finalize", "destination": "/api/auth/bank?action=finalize" }

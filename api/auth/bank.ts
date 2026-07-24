@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { createOAuthState, getVerifiedUser, verifyOAuthState } from '../../lib/auth';
@@ -11,6 +10,11 @@ import {
   startAuthSession,
 } from '../../lib/enablebanking';
 import { sendError } from '../../lib/errors';
+import {
+  consumePendingGrant,
+  HANDLE_MAX_LENGTH,
+  mintPendingGrant,
+} from '../../lib/pendinggrants';
 import { getSupabase } from '../../lib/supabase';
 
 // Deep link the iOS app's ASWebAuthenticationSession listens on.
@@ -25,12 +29,7 @@ const RENEW_WINDOW_DAYS = 14;
 
 // One-time handle for the two-step connect (task 15): the browser callback parks
 // the exchanged session behind this handle and the app finalizes it under its own
-// auth. Very short-lived — the app calls finalize the moment the deep link returns.
-const HANDLE_TTL_MS = 2 * 60 * 1000;
-const HANDLE_BYTES = 32;
-// base64url of 32 bytes is 43 chars; a small ceiling keeps the lookup key sane.
-const HANDLE_MAX_LENGTH = 64;
-
+// auth. Minting and single-use consumption live in lib/pendinggrants.ts.
 const finalizeSchema = z.object({
   handle: z.string().min(1).max(HANDLE_MAX_LENGTH),
 });
@@ -179,20 +178,16 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
   // it encrypted (same format as users.bank_access_token) behind a random handle
   // that expires in minutes; finalize moves the ciphertext across verbatim, so
   // the plaintext session never resurfaces here.
-  const handle = randomBytes(HANDLE_BYTES).toString('base64url');
-  const { error } = await getSupabase().from('bank_pending_sessions').insert({
-    handle,
+  const minted = await mintPendingGrant('bank_pending_sessions', userId, {
     session_ciphertext: encryptToken(session.sessionId),
     valid_until: session.validUntil,
-    initiator_user_id: userId,
-    expires_at: new Date(Date.now() + HANDLE_TTL_MS).toISOString(),
   });
-  if (error) {
-    console.error('auth/bank: storing pending session failed:', error.message);
+  if ('error' in minted) {
+    console.error('auth/bank: storing pending session failed:', minted.error);
     return sendError(res, 500, 'SUPABASE_ERROR', 'Database write failed while completing bank authorization');
   }
 
-  res.redirect(302, `${APP_CALLBACK}?status=success&handle=${encodeURIComponent(handle)}`);
+  res.redirect(302, `${APP_CALLBACK}?status=success&handle=${encodeURIComponent(minted.handle)}`);
 }
 
 /**
@@ -216,52 +211,44 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
   }
   const { handle } = parsed.data;
 
-  const supabase = getSupabase();
-  const { data: pending, error: readError } = await supabase
-    .from('bank_pending_sessions')
-    .select('session_ciphertext, valid_until, initiator_user_id, expires_at')
-    .eq('handle', handle)
-    .maybeSingle();
-  if (readError) {
-    console.error('auth/bank: reading pending session failed:', readError.message);
-    return sendError(res, 500, 'SUPABASE_ERROR', 'Could not complete bank authorization');
+  // Single-use, initiator-bound consumption is the shared task-15/17 mechanism.
+  const result = await consumePendingGrant('bank_pending_sessions', handle, user.userId, [
+    'session_ciphertext',
+    'valid_until',
+  ]);
+  if (!result.ok) {
+    switch (result.reason) {
+      case 'db_error':
+        console.error('auth/bank: reading pending session failed:', result.detail);
+        return sendError(res, 500, 'SUPABASE_ERROR', 'Could not complete bank authorization');
+      case 'not_found':
+        return sendError(
+          res,
+          404,
+          'INVALID_REQUEST',
+          'Unknown or already-used bank authorization — restart the bank connection from the app',
+        );
+      case 'expired':
+        return sendError(
+          res,
+          400,
+          'INVALID_REQUEST',
+          'Bank authorization expired before it was finalized — restart the bank connection from the app',
+        );
+      case 'wrong_initiator':
+        return sendError(res, 403, 'INVALID_REQUEST', 'This bank authorization belongs to a different account');
+    }
   }
-  if (!pending) {
-    return sendError(
-      res,
-      404,
-      'INVALID_REQUEST',
-      'Unknown or already-used bank authorization — restart the bank connection from the app',
-    );
-  }
-
-  // Consume the handle before doing anything with it: single-use even if a later
-  // step fails, so a leaked or replayed handle is already dead.
-  await supabase.from('bank_pending_sessions').delete().eq('handle', handle);
-
-  if (new Date(pending.expires_at).getTime() <= Date.now()) {
-    return sendError(
-      res,
-      400,
-      'INVALID_REQUEST',
-      'Bank authorization expired before it was finalized — restart the bank connection from the app',
-    );
-  }
-  // Only the account that initiated the flow may finalize it. Blocks the reverse
-  // account-linking direction (a handle delivered to another device attaching a
-  // stranger's bank to this caller), independent of how the app handles deep links.
-  if (pending.initiator_user_id !== user.userId) {
-    return sendError(res, 403, 'INVALID_REQUEST', 'This bank authorization belongs to a different account');
-  }
+  const { session_ciphertext, valid_until } = result.payload;
 
   // Move the ciphertext across as-is — both columns hold AES-256-GCM(session_id)
   // under the same key, so there is nothing to re-encrypt.
-  const { error: updateError } = await supabase
+  const { error: updateError } = await getSupabase()
     .from('users')
     .update({
-      bank_access_token: pending.session_ciphertext,
+      bank_access_token: session_ciphertext,
       bank_refresh_token: null,
-      bank_token_expiry: pending.valid_until,
+      bank_token_expiry: valid_until,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.userId)
@@ -281,7 +268,7 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
     return sendError(res, 500, 'SUPABASE_ERROR', 'Database write failed while storing bank credentials');
   }
 
-  res.status(200).json({ status: 'connected', expiresAt: pending.valid_until });
+  res.status(200).json({ status: 'connected', expiresAt: valid_until });
 }
 
 export interface BankStatus {

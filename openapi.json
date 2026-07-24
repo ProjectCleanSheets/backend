@@ -333,7 +333,7 @@
       "get": {
         "tags": ["auth"],
         "summary": "Start the Google Sheets consent flow (action=start)",
-        "description": "Returns the Google consent URL that grants the backend a Sheets-scope refresh token. Open the returned URL in a browser. The callback (`/auth/google/callback`) is browser-only and not testable here.",
+        "description": "Returns the Google consent URL that grants the backend a Sheets-scope refresh token. Open the returned URL in a browser. The callback (`/auth/google/callback`) is browser-only and not testable here — it no longer stores the refresh token; it redirects to `cleansheets://oauth/google?status=success&handle=<handle>` with a one-time, ~2-minute handle, and the app completes the connection with POST /api/auth/google/finalize.",
         "parameters": [
           {
             "name": "action",
@@ -354,6 +354,72 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "405": {
             "description": "Unsupported method or action",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/google/finalize": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Finalize Google Sheets access under the authenticated caller",
+        "description": "Second step of the Google Sheets connect flow (task 17). The browser callback no longer stores the refresh token; it redirects to `cleansheets://oauth/google?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own identity token (Google or Apple), and the refresh token is stored under the verified caller — so a consent completed against someone else's flow can never attach Google Sheets access to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["handle"],
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "description": "One-time handle from the callback deep link"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Google Sheets access stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["status"],
+                  "properties": {
+                    "status": { "type": "string", "enum": ["connected"] }
+                  }
+                },
+                "example": { "status": "connected" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, or the handle expired before finalize",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": {
+            "description": "Handle belongs to a different account",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "404": {
+            "description": "Unknown or already-used handle",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "Database failure",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }
