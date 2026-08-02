@@ -13,6 +13,19 @@ The board MUST be kept up to date as the project grows:
 - Any newly discovered work gets a task file in `tasks/` and a Backlog entry (with
   Fibonacci story points) BEFORE implementation starts. No untracked work.
 
+## Cross-Repo Ledger
+Work the **app** needs from this backend (and vice versa) is tracked in
+`../CROSS_REPO_LEDGER.md` — a shared file at the project root, outside both git
+repos, that both agents read and write directly. It is separate from `TASKS.md`
+(this repo's own board) and from `openapi.json` (the API contract).
+
+At the **start of every session, read that file.** If it has an `OPEN` entry
+directed `→ backend`, you own it: file it on this board (`TASKS.md` + a `tasks/`
+file) and mark it `ACCEPTED`, or do it now if small. When you finish, set the
+entry `DONE`, note anything the app side must then do (re-copy the contract, etc.),
+and move it to the Log. When *you* need something from the app repo, add an entry
+there before proceeding. Full protocol is in the file's header.
+
 ## Git Workflow
 The owner reviews every change before it enters git history:
 - **Never commit or push yourself.** Create the task's branch, implement on it, and
@@ -25,7 +38,8 @@ The owner reviews every change before it enters git history:
 backend/
 ├── api/
 │   ├── auth/
-│   │   ├── google.ts          — Google OAuth sign in + callback
+│   │   ├── session.ts         — sign in (identity token → session) + refresh
+│   │   ├── google.ts          — setup state + Google Sheets consent + callback
 │   │   └── bank.ts            — Enable Banking connect + callback + status
 │   ├── sheet/
 │   │   ├── structure.ts       — read sheet tabs and category rows
@@ -38,6 +52,8 @@ backend/
 │   │   └── config.ts          — get/post user config from Supabase
 │   └── docs.ts                — Swagger UI (serves openapi.json)
 ├── lib/
+│   ├── auth.ts                — request authentication + identity-token sign in
+│   ├── session.ts             — backend access/refresh token mint, verify, rotate
 │   ├── supabase.ts            — Supabase client singleton
 │   ├── sheets.ts              — Google Sheets API helper
 │   ├── enablebanking.ts       — Enable Banking API helper
@@ -67,18 +83,40 @@ Free tier enforcement is NOT implemented in this release. Skip it entirely.
 - Auth: Sign in with Google or Apple (identity-token verification on every request)
 
 ## Authentication
-Every request from the iOS app includes `Authorization: Bearer <identity_token>` in the header — a Google ID token or an Apple identity token. The backend verifies this token (with Google, or against Apple's JWKS) on each request and maps the verified `(provider, subject)` to a stable internal `user_id` that identifies the user. Never trust the user ID from the request body.
+Two token kinds, and the distinction matters (task 19):
+
+- **Identity token** — a Google ID token or Apple identity token from the device's
+  native sign-in. Accepted by **exactly one** endpoint, `POST /api/auth/session`,
+  which verifies it (with Google, or against Apple's JWKS), maps the verified
+  `(provider, subject)` to a stable internal `user_id`, provisions the row on
+  first sign-in, and exchanges it for a session.
+- **Access token** — the backend's own short-lived (1 h) HS256 token, carried as
+  `Authorization: Bearer <access_token>` on **every other request** and verified
+  locally by `getVerifiedUser` (`lib/auth.ts`). Paired with a long-lived,
+  single-use refresh token (`POST /api/auth/session/refresh`) so the app renews a
+  session without a fresh identity token — Apple's expire in ~10 minutes and
+  cannot be refreshed on-device.
+
+Never trust the user ID from the request body: identity always comes from the
+verified token.
 
 ## Security Requirements
 This backend handles financial data. Every task must satisfy these; task 09 audits them
 before production use.
 
-- **ID token verification**: identity is provider-agnostic (task 16). A bearer token is a
-  Google ID token (verified via google-auth-library, `aud === GOOGLE_CLIENT_ID`) or an
-  Apple identity token (RS256 against Apple's JWKS, `iss === https://appleid.apple.com`,
-  `aud === APPLE_CLIENT_ID`); both check signature and expiry. `getVerifiedUser` maps the
-  verified `(provider, subject)` to a stable internal `user_id`. User identity comes ONLY
-  from the verified token — never from request body/query.
+- **ID token verification**: identity is provider-agnostic (task 16). At sign-in
+  (`POST /api/auth/session` → `signInWithIdentityToken`) the bearer token is a Google ID
+  token (verified via google-auth-library, `aud === GOOGLE_CLIENT_ID`) or an Apple
+  identity token (RS256 against Apple's JWKS, `iss === https://appleid.apple.com`,
+  `aud === APPLE_CLIENT_ID`); both check signature and expiry, and map to a stable
+  internal `user_id`. User identity comes ONLY from the verified token — never from
+  request body/query.
+- **Session tokens** (task 19): every other endpoint authenticates with the backend's own
+  access token via `getVerifiedUser` — HS256 over a key derived from `ENCRYPTION_KEY`
+  (HKDF, its own `info`), header pinned by construction so no `alg` is ever read from the
+  token, and issuer/type/expiry/`sub` all checked. Refresh tokens are 32 random bytes,
+  stored ONLY as a SHA-256 hash in `user_sessions`, and single-use: each refresh consumes
+  the presented token and issues a new pair. Never log either token.
 - **Token encryption**: AES-256-GCM (authenticated encryption) with a random IV per
   value, key from `ENCRYPTION_KEY`. Never CBC/ECB.
 - **Supabase access**: the backend uses `SUPABASE_SERVICE_ROLE_KEY` (RLS is enabled, so
@@ -132,7 +170,10 @@ Error codes:
 - `SHEET_WRITE_FAILED` — Google Sheets write failed
 - `SHEET_NOT_FOUND` — tab or sheet not accessible
 - `BANK_TOKEN_EXPIRED` — Enable Banking consent expired, user must reconnect
-- `GOOGLE_TOKEN_EXPIRED` — Google auth token expired, user must re-sign in
+- `GOOGLE_TOKEN_EXPIRED` — missing/invalid/expired access token (or, at sign-in, a
+  rejected identity token); the app refreshes the session and retries
+- `SESSION_EXPIRED` — refresh token unknown, expired or already used; the session is
+  over and the user must sign in again. Only `POST /api/auth/session/refresh` returns it
 - `SUPABASE_ERROR` — database read/write failed
 - `CATEGORY_NOT_FOUND` — section+category lookup returned no matching row
 - `INVALID_REQUEST` — malformed or missing required fields
@@ -179,6 +220,10 @@ Users table keyed to a provider-agnostic internal identity (task 16). Stores:
   (an Apple-login user connects a Google account here; it need not match any login)
 - `created_at`, `updated_at`
 
+`user_sessions` holds the backend sessions (task 19): `token_hash` (SHA-256 of the
+refresh token — the token itself is never stored), `user_id`, `expires_at`,
+`created_at`. Rows are consumed on refresh and deleted with the account.
+
 ## Coding Principles
 - Simple and readable over clever
 - Each `api/` file handles one feature area — no cross-importing between api files
@@ -192,6 +237,7 @@ Users table keyed to a provider-agnostic internal identity (task 16). Stores:
 ## Key Files to Read First
 Before making changes, always read:
 - `TASKS.md` and your assigned task file in `tasks/` — scope and acceptance criteria
+- `lib/auth.ts` + `lib/session.ts` — understand the two-token auth model
 - `lib/supabase.ts` — understand the client setup
 - `lib/sheets.ts` — understand how sheet navigation works
 - `lib/enablebanking.ts` — understand the API auth pattern

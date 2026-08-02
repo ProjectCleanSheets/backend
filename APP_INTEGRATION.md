@@ -32,7 +32,8 @@ Wiring:
 1. Drop a copy of `openapi.json` into the app target and register the generator
    build plugin against it.
 2. Provide the base URL (see §3) and an auth middleware that injects the
-   `Authorization: Bearer <identity_token>` header on every request (see §4).
+   `Authorization: Bearer <accessToken>` header on every request, and that
+   refreshes the session on 401 (see §4).
 3. Regenerate whenever you re-copy `openapi.json`.
 
 A hand-written `URLSession` layer is fine too — if so, treat §6 (endpoint index)
@@ -52,6 +53,8 @@ the `{ code, message }` error decoding.
 - Identity is **server-derived from the bearer token on every request**. The app
   never sends a user id in a body or query; there is no "user id" parameter
   anywhere. Whatever account the bearer token proves is the account acted on.
+- The bearer token is a **backend session token**, not the Google/Apple identity
+  token — the app exchanges the latter for the former once, at sign-in (§4).
 
 ---
 
@@ -70,29 +73,67 @@ constant.
 
 ## 4. Authentication
 
-Every request (except the browser-only OAuth callbacks, which the app never
-calls) must include:
+The app signs in **once** and then holds a **backend-issued token pair**. A
+provider identity token (Google/Apple) goes to exactly one endpoint — the
+exchange — and nowhere else.
+
+**Why:** an Apple identity token expires in ~10 minutes and **cannot be refreshed
+on-device**. Sending it on every request would log Sign-in-with-Apple users out
+constantly. The backend verifies it once and issues its own tokens, so the app has
+a single refresh path for both providers.
+
+### 4.1 Sign in — exchange the identity token
+
+After native Google Sign-In or Sign in with Apple:
 
 ```
-Authorization: Bearer <identity_token>
+POST /api/auth/session
+Authorization: Bearer <identity_token>     ← Google ID token or Apple identity token
 ```
 
-`<identity_token>` is **either**:
-- a **Google ID token** from native Google Sign-In, or
-- an **Apple identity token** from Sign in with Apple.
+→ `{ accessToken, refreshToken, expiresIn, userId, provider }`
 
-The backend verifies the token's signature, issuer, audience, and expiry on every
-request, and maps the verified `(provider, subject)` to a stable internal user.
-The **first** authenticated request for a new identity provisions the user row
-automatically — there is no separate "register" call.
+- **`accessToken`** — send as `Authorization: Bearer <accessToken>` on **every**
+  other endpoint. Valid `expiresIn` seconds (3600 = 1 h).
+- **`refreshToken`** — store in the **keychain**, never `UserDefaults`. Valid ~60
+  days, and **single-use** (see §4.2).
+- The first sign-in for a new identity provisions the user row — there is no
+  separate "register" call.
+- `POST /api/auth/google` is still the "who am I / what's my setup state" call
+  (`userId`, `provider`, `hasConfig`, `hasSheetsAccess`) — call it after sign-in
+  to learn what onboarding steps remain. It now takes the **access token**, like
+  everything else.
 
-- `POST /api/auth/google` is a convenience "who am I / what's my setup state"
-  call (returns `userId`, `provider`, `hasConfig`, `hasSheetsAccess`). Despite the
-  name it works for Apple-login users too — call it after sign-in to learn what
-  onboarding steps remain.
-- A missing/invalid/expired token returns **401** with code
-  `GOOGLE_TOKEN_EXPIRED` → route the user back to sign-in and refresh the identity
-  token.
+### 4.2 Refresh — before the access token expires
+
+```
+POST /api/auth/session/refresh             ← no Authorization header
+{ "refreshToken": "<stored refresh token>" }
+```
+
+→ `{ accessToken, refreshToken, expiresIn }`
+
+**Both tokens are new — overwrite the stored pair.** The token you presented is
+consumed by the call (rotation), so:
+- persist the response *before* firing further requests, and
+- serialize refreshes: at most one in flight, with other requests queued behind
+  it. Two parallel refreshes with the same token means one of them fails and the
+  session is lost.
+
+Refresh pre-emptively (when the access token is nearly expired) and most 401s
+never happen.
+
+### 4.3 Reacting to 401
+
+| Where | Code | What it means / do |
+|---|---|---|
+| any normal endpoint | `GOOGLE_TOKEN_EXPIRED` | Access token missing/expired → refresh (§4.2), retry the request once. |
+| `POST /api/auth/session/refresh` | `SESSION_EXPIRED` | Session is over (unknown, expired, already-used token, or the account was deleted) → run native sign-in and exchange again (§4.1). |
+| `POST /api/auth/session` | `GOOGLE_TOKEN_EXPIRED` | The identity token itself was rejected → re-run native sign-in. |
+
+Deleting the account (`DELETE /api/user/account`) invalidates every device's
+refresh token immediately; the current access token keeps verifying until it
+expires but has no data left to reach. Sign out locally right after.
 
 **Important:** the login identity (Google or Apple) is decoupled from the Google
 account that owns the spreadsheet. An Apple-login user still connects a Google
@@ -155,10 +196,15 @@ sheet endpoints in §6 work.
 ## 6. Endpoint index
 
 Paths, payloads, and response schemas are defined in `openapi.json`; this is the
-map. All require `Authorization: Bearer …`.
+map. All require `Authorization: Bearer <accessToken>` except the two session
+endpoints (§4).
+
+**Session**
+- `POST /api/auth/session` — sign in: identity token → token pair (§4.1).
+- `POST /api/auth/session/refresh` — refresh token → new pair (§4.2). No Bearer.
 
 **Auth / onboarding**
-- `POST /api/auth/google` — sign-in / setup state (`hasConfig`, `hasSheetsAccess`).
+- `POST /api/auth/google` — setup state (`hasConfig`, `hasSheetsAccess`).
 - `GET  /api/auth/google?action=start` → Google Sheets consent URL.
 - `POST /api/auth/google/finalize` — finalize Sheets consent (§5.2).
 - `GET  /api/auth/bank` → bank consent URL.
@@ -199,7 +245,8 @@ show `message` only as a fallback. Codes:
 
 | Code | Meaning | App reaction |
 |---|---|---|
-| `GOOGLE_TOKEN_EXPIRED` | Missing/invalid identity token (401) | Re-authenticate; refresh the identity token and retry. |
+| `GOOGLE_TOKEN_EXPIRED` | Missing/invalid/expired access token (401) | Refresh the session (§4.2) and retry once; if that fails, sign in again. |
+| `SESSION_EXPIRED` | The refresh token is unknown, expired or already used (401, refresh endpoint only) | Session is over — run native sign-in and exchange again (§4.1). |
 | `BANK_TOKEN_EXPIRED` | Bank consent lapsed | Prompt to reconnect the bank (run §5.1). |
 | `SHEET_NOT_FOUND` | Sheet/tab not accessible | Prompt to re-check the sheet or reconnect Google (§5.2). |
 | `CATEGORY_NOT_FOUND` | No matching section+category row | Offer to create the category (`POST /api/sheet/category`) or pick another. |
@@ -229,7 +276,8 @@ show `message` only as a fallback. Codes:
 
 ## 9. Onboarding sequence (suggested)
 
-1. Sign in (Google or Apple) → obtain identity token.
+1. Sign in (Google or Apple) → identity token → `POST /api/auth/session` → store
+   the token pair (§4.1). On later launches, refresh instead of re-signing in.
 2. `POST /api/auth/google` → read `hasConfig` / `hasSheetsAccess`.
 3. If no Sheets access → run the Google Sheets consent flow (§5.2).
 4. Set the sheet + column mapping → `POST /api/user/config`.

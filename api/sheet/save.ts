@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
     }
 
     if (req.method === 'POST') {

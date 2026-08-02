@@ -2,6 +2,7 @@ import { createHmac, createPublicKey, createVerify, hkdfSync, timingSafeEqual } 
 import type { VercelRequest } from '@vercel/node';
 import { OAuth2Client } from 'google-auth-library';
 import { loadEncryptionKey } from './crypto';
+import { verifyAccessToken } from './session';
 import { getSupabase } from './supabase';
 
 const verifierClient = new OAuth2Client();
@@ -13,9 +14,6 @@ export interface AuthedUser {
   // filters on. Independent of which provider the caller logged in with.
   userId: string;
   provider: AuthProvider;
-  // The provider's `sub` claim (Google account id, or Apple's stable user id).
-  subject: string;
-  email?: string;
 }
 
 // Issuers, used both to route an incoming bearer token to the right verifier and
@@ -25,36 +23,65 @@ const APPLE_ISSUER = 'https://appleid.apple.com';
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 
 /**
- * Verifies the `Authorization: Bearer <identity_token>` header and maps it to a
- * stable internal user. The token may be a Google ID token or an Apple identity
- * token; either way the signature, issuer, audience, and expiry are verified and
- * identity comes only from the verified token — never from the request body.
+ * Authenticates an app request: verifies the `Authorization: Bearer
+ * <access_token>` header — a backend-issued session token (task 19) — and returns
+ * the caller's stable internal identity. Identity comes only from the verified
+ * token, never from the request body.
  *
- * Returns null when there is no valid token (→ 401). On the first authenticated
- * request for a given identity the user row is provisioned, so the returned
- * userId is stable across requests. Database failures throw (→ 500), keeping the
- * "no token" (null) and "backend broke" (throw) cases distinct for callers.
+ * Provider identity tokens are NOT accepted here: they are exchanged for a
+ * session exactly once, by signInWithIdentityToken. So verification is a local
+ * signature check — no provider round-trip and no database lookup, both of which
+ * this used to do on every request.
+ *
+ * Returns null when there is no valid token (→ 401), which the app answers by
+ * refreshing the session (POST /api/auth/session/refresh) and, failing that,
+ * signing in again.
  */
 export async function getVerifiedUser(req: VercelRequest): Promise<AuthedUser | null> {
+  const token = bearerToken(req);
+  if (!token) {
+    return null;
+  }
+  return verifyAccessToken(token);
+}
+
+/**
+ * Sign-in: verifies a provider identity token from the `Authorization: Bearer`
+ * header — a Google ID token or an Apple identity token, either way checking
+ * signature, issuer, audience and expiry — and maps it to the stable internal
+ * user, provisioning the row on first sight. Used only by POST /api/auth/session,
+ * which exchanges it for a session token pair.
+ *
+ * Returns null when there is no valid token (→ 401). Database failures throw
+ * (→ 500), keeping the "no token" (null) and "backend broke" (throw) cases
+ * distinct for callers.
+ */
+export async function signInWithIdentityToken(req: VercelRequest): Promise<AuthedUser | null> {
+  const token = bearerToken(req);
+  if (!token) {
+    return null;
+  }
+
+  const provider = detectProvider(token);
+  let subject: string | null = null;
+  if (provider === 'google') {
+    subject = await verifyGoogleToken(token);
+  } else if (provider === 'apple') {
+    subject = await verifyAppleToken(token);
+  }
+  if (!provider || !subject) {
+    return null;
+  }
+
+  return { userId: await resolveUserId(provider, subject), provider };
+}
+
+function bearerToken(req: VercelRequest): string | null {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return null;
   }
-  const token = header.slice('Bearer '.length).trim();
-
-  const provider = detectProvider(token);
-  let identity: { subject: string; email?: string } | null = null;
-  if (provider === 'google') {
-    identity = await verifyGoogleToken(token);
-  } else if (provider === 'apple') {
-    identity = await verifyAppleToken(token);
-  }
-  if (!provider || !identity) {
-    return null;
-  }
-
-  const userId = await resolveUserId(provider, identity.subject);
-  return { userId, provider, subject: identity.subject, email: identity.email };
+  return header.slice('Bearer '.length).trim() || null;
 }
 
 /**
@@ -76,18 +103,15 @@ function detectProvider(token: string): AuthProvider | null {
   return null;
 }
 
-async function verifyGoogleToken(idToken: string): Promise<{ subject: string; email?: string } | null> {
+/** Returns the verified Google `sub`, or null if the token is not valid for us. */
+async function verifyGoogleToken(idToken: string): Promise<string | null> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     throw new Error('GOOGLE_CLIENT_ID is not set');
   }
   try {
     const ticket = await verifierClient.verifyIdToken({ idToken, audience: clientId });
-    const payload = ticket.getPayload();
-    if (!payload?.sub) {
-      return null;
-    }
-    return { subject: payload.sub, email: payload.email };
+    return ticket.getPayload()?.sub ?? null;
   } catch {
     return null;
   }
@@ -124,9 +148,10 @@ async function appleKeyForKid(kid: string): Promise<AppleJwk | null> {
  * Verifies an Apple identity token: RS256 signature against Apple's JWKS, then
  * issuer, audience (APPLE_CLIENT_ID) and expiry. RS256 is hard-required from the
  * header and the key is used only for RSA-SHA256 verification, so there is no
- * `alg: none`/HS256 confusion path. Returns null on any failure.
+ * `alg: none`/HS256 confusion path. Returns the verified Apple `sub`, or null on
+ * any failure.
  */
-async function verifyAppleToken(idToken: string): Promise<{ subject: string; email?: string } | null> {
+async function verifyAppleToken(idToken: string): Promise<string | null> {
   const clientId = process.env.APPLE_CLIENT_ID;
   if (!clientId) {
     throw new Error('APPLE_CLIENT_ID is not set');
@@ -172,7 +197,7 @@ async function verifyAppleToken(idToken: string): Promise<{ subject: string; ema
   if (typeof payload.sub !== 'string' || !payload.sub) {
     return null;
   }
-  return { subject: payload.sub, email: typeof payload.email === 'string' ? payload.email : undefined };
+  return payload.sub;
 }
 
 // Decodes JWT segment `index` (0 = header, 1 = payload) as JSON without verifying
@@ -191,7 +216,7 @@ function decodeJwtSegment(token: string, index: number): Record<string, unknown>
 
 /**
  * Maps a verified (provider, subject) to the internal user id, provisioning the
- * row on first sight. The upsert makes concurrent first requests for the same
+ * row on first sign-in. The upsert makes concurrent first sign-ins for the same
  * identity converge on a single row instead of racing to insert duplicates.
  */
 async function resolveUserId(provider: AuthProvider, subject: string): Promise<string> {

@@ -117,7 +117,7 @@ function sendEnableBankingError(res: VercelResponse, err: EnableBankingError): v
 async function startConnect(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
   const parsed = startQuerySchema.safeParse(req.query);
@@ -202,7 +202,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
 async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
   const parsed = finalizeSchema.safeParse(req.body);
@@ -300,7 +300,7 @@ export function computeBankStatus(expiresAt: string | null, now: number): BankSt
 async function handleStatus(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
   const { data, error } = await getSupabase()

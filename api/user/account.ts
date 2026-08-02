@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const user = await getVerifiedUser(req);
     if (!user) {
-      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+      return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
     }
 
     const supabase = getSupabase();
@@ -52,10 +52,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     // Remove everything we store for this user. Every delete filters by the
     // verified internal user id — never anything from the request — so only the
-    // caller's own rows are affected. Pending grants first, then the users row.
+    // caller's own rows are affected. Pending grants and sessions first, then the
+    // users row. Dropping the sessions (task 19) revokes every device's refresh
+    // token; the caller's own access token still verifies until it expires (≤ 1 h)
+    // but has nothing left to reach.
     const swept =
       (await deleteOwned('bank_pending_sessions', 'initiator_user_id', user.userId)) &&
       (await deleteOwned('google_pending_grants', 'initiator_user_id', user.userId)) &&
+      (await deleteOwned('user_sessions', 'user_id', user.userId)) &&
       (await deleteOwned('users', 'id', user.userId));
     if (!swept) {
       return sendError(res, 500, 'SUPABASE_ERROR', 'Could not delete account');

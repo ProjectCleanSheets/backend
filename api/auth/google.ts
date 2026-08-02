@@ -56,23 +56,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 }
 
 /**
- * POST /api/auth/google — called by the iOS app after native Google Sign-In.
- * getVerifiedUser verifies the ID token and provisions the user row on first
- * sight, so this just reports the caller's setup state.
+ * POST /api/auth/google — the app's "who am I / what's left to set up" call,
+ * made after sign-in (POST /api/auth/session, which is where the identity token
+ * is verified and the user row provisioned — task 19). Works for Apple logins
+ * too, despite the name.
  */
 async function signIn(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
   const { data, error } = await getSupabase()
     .from('users')
     .select('sheet_id, google_refresh_token')
     .eq('id', user.userId)
-    .single();
+    .maybeSingle();
   if (error) {
     return sendError(res, 500, 'SUPABASE_ERROR', 'Could not load user');
+  }
+  // The row is created at sign-in, so a missing one means the account was deleted
+  // while this (still unexpired) access token was in flight.
+  if (!data) {
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'This account no longer exists — sign in again');
   }
 
   res.status(200).json({
@@ -91,15 +97,18 @@ async function signIn(req: VercelRequest, res: VercelResponse): Promise<void> {
 async function startOAuth(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
+  // No login_hint: since task 16 the login account is deliberately decoupled from
+  // the Google account that owns the sheet (an Apple user connects whichever
+  // Google account they like), so Google's own account chooser is the right
+  // affordance — and task 19 stopped carrying the login e-mail per request.
   const url = oauthClient().generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent', // force a refresh token even on repeat consent
     scope: OAUTH_SCOPES,
     state: createOAuthState(user.userId),
-    login_hint: user.email,
   });
   res.status(200).json({ url });
 }
@@ -166,7 +175,7 @@ async function handleCallback(req: VercelRequest, res: VercelResponse): Promise<
 async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<void> {
   const user = await getVerifiedUser(req);
   if (!user) {
-    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid identity token');
+    return sendError(res, 401, 'GOOGLE_TOKEN_EXPIRED', 'Missing or invalid access token');
   }
 
   const parsed = finalizeSchema.safeParse(req.body);

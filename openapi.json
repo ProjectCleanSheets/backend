@@ -3,18 +3,24 @@
   "info": {
     "title": "CleanSheets Backend",
     "version": "1.0.0",
-    "description": "Bridge between the CleanSheets iOS app, Google Sheets, Enable Banking, and Supabase. All endpoints require `Authorization: Bearer <identity_token>` — a Google **or** Apple identity token — unless noted; identity is resolved to a stable internal user regardless of provider. Sign in with Google at the top of this page to auto-authorize Try-it-out requests (the button mints Google tokens; an Apple token can be pasted into the Authorize dialog)."
+    "description": "Bridge between the CleanSheets iOS app, Google Sheets, Enable Banking, and Supabase. Sign in once at `POST /api/auth/session` with a Google **or** Apple identity token; it returns a backend **access token** (1 h) and a **refresh token** (60 days, single-use). Every other endpoint requires `Authorization: Bearer <access_token>` unless noted — identity is resolved from that token to a stable internal user, never from a request body. Sign in with Google at the top of this page to auto-authorize Try-it-out requests (the button mints a Google ID token, exchanges it for a session, and attaches the access token; an Apple token can be pasted into the Authorize dialog's identityToken field and exchanged manually)."
   },
   "servers": [
     { "url": "/", "description": "This deployment" }
   ],
   "components": {
     "securitySchemes": {
-      "googleIdToken": {
+      "accessToken": {
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Identity token — a Google ID token (audience = GOOGLE_CLIENT_ID) or an Apple identity token (audience = APPLE_CLIENT_ID). Verified and mapped to a stable internal user id."
+        "description": "Backend access token from POST /api/auth/session (or /api/auth/session/refresh). Short-lived (1 h) and verified locally; it carries the stable internal user id. This is the credential for every endpoint except the two session endpoints."
+      },
+      "identityToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Provider identity token — a Google ID token (audience = GOOGLE_CLIENT_ID) or an Apple identity token (audience = APPLE_CLIENT_ID). Accepted **only** by POST /api/auth/session, which verifies it once and exchanges it for a session."
       }
     },
     "schemas": {
@@ -29,12 +35,35 @@
               "SHEET_NOT_FOUND",
               "BANK_TOKEN_EXPIRED",
               "GOOGLE_TOKEN_EXPIRED",
+              "SESSION_EXPIRED",
               "SUPABASE_ERROR",
               "CATEGORY_NOT_FOUND",
               "INVALID_REQUEST"
             ]
           },
           "message": { "type": "string" }
+        }
+      },
+      "SessionTokens": {
+        "type": "object",
+        "description": "A backend session. Returned by sign-in and by refresh; the refresh response omits userId/provider (they are unchanged).",
+        "required": ["accessToken", "refreshToken", "expiresIn"],
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Send as `Authorization: Bearer <accessToken>` on every other endpoint."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Single-use, ~60 days. Store it in the keychain; each refresh returns a replacement."
+          },
+          "expiresIn": {
+            "type": "integer",
+            "description": "Seconds until accessToken expires (3600). Refresh before this elapses.",
+            "example": 3600
+          },
+          "userId": { "type": "string", "description": "Stable internal user id (uuid). Sign-in only." },
+          "provider": { "type": "string", "enum": ["google", "apple"], "description": "Login provider of the verified identity token. Sign-in only." }
         }
       },
       "ColumnMapping": {
@@ -296,20 +325,95 @@
     },
     "responses": {
       "Unauthorized": {
-        "description": "Missing or invalid identity token (Google or Apple)",
+        "description": "Missing, invalid or expired access token — refresh the session (POST /api/auth/session/refresh) and retry, or sign in again",
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
         }
       }
     }
   },
-  "security": [{ "googleIdToken": [] }],
+  "security": [{ "accessToken": [] }],
   "paths": {
+    "/api/auth/session": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Sign in — exchange a provider identity token for a backend session",
+        "description": "The one place a provider identity token is accepted. Send `Authorization: Bearer <identity_token>` (a Google ID token or an Apple identity token); it is verified once — signature, issuer, audience, expiry — the internal user row is provisioned on first sign-in, and a session token pair is returned. Every other endpoint then takes the returned `accessToken` as Bearer.\n\nThis exists because an Apple identity token expires in ~10 minutes and cannot be refreshed on-device: re-verifying it per request would log Sign-in-with-Apple users out constantly.",
+        "security": [{ "identityToken": [] }],
+        "responses": {
+          "200": {
+            "description": "Signed in — store both tokens (the refresh token in the keychain)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionTokens" }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid identity token — run native sign-in again",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "405": {
+            "description": "Unsupported method",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/session/refresh": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Refresh the session — swap a refresh token for a fresh pair",
+        "description": "Unauthenticated by design: the refresh token *is* the credential, and the access token it replaces has usually expired. **The refresh token is single-use** — the presented one is consumed and a new pair returned (rotation), so the response must be stored before the next call. On 401 the session is over (unknown, expired, already used, or the account was deleted) and the app must run native sign-in again.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refreshToken"],
+                "properties": {
+                  "refreshToken": { "type": "string", "description": "The refresh token from the last session response" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair — replaces the old one",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SessionTokens" }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or malformed body",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "401": {
+            "description": "`SESSION_EXPIRED` — the refresh token is unknown, expired or already used; sign in again",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } },
+              "example": { "code": "SESSION_EXPIRED", "message": "Session expired or already refreshed — sign in again" }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/google": {
       "post": {
         "tags": ["auth"],
-        "summary": "Sign in with Google — verify the ID token and provision the user row if missing",
-        "description": "Confirms a Google login and reports the caller's setup state. The user row is provisioned on the first authenticated request (any endpoint), so Apple-login clients do not need a separate sign-in call.",
+        "summary": "Setup state — what the signed-in caller still has to connect",
+        "description": "Reports the caller's setup state after sign-in. Despite the name it works for Apple-login users too; sign-in itself (and user-row provisioning) happens at POST /api/auth/session, so this takes the access token like every other endpoint.",
         "responses": {
           "200": {
             "description": "Signed in",
@@ -365,7 +469,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Finalize Google Sheets access under the authenticated caller",
-        "description": "Second step of the Google Sheets connect flow (task 17). The browser callback no longer stores the refresh token; it redirects to `cleansheets://oauth/google?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own identity token (Google or Apple), and the refresh token is stored under the verified caller — so a consent completed against someone else's flow can never attach Google Sheets access to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
+        "description": "Second step of the Google Sheets connect flow (task 17). The browser callback no longer stores the refresh token; it redirects to `cleansheets://oauth/google?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own access token, and the refresh token is stored under the verified caller — so a consent completed against someone else's flow can never attach Google Sheets access to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
         "requestBody": {
           "required": true,
           "content": {
@@ -527,7 +631,7 @@
       "post": {
         "tags": ["auth"],
         "summary": "Finalize a bank connection under the authenticated caller",
-        "description": "Second step of the connect flow (task 15). The browser callback no longer stores the bank session; it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own identity token (Google or Apple), and the session is stored under the verified caller — so a consent completed against someone else's flow can never attach to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
+        "description": "Second step of the connect flow (task 15). The browser callback no longer stores the bank session; it redirects to `cleansheets://oauth/bank?status=success&handle=<handle>` with a one-time, ~2-minute handle. The app calls this endpoint with that handle and its own access token, and the session is stored under the verified caller — so a consent completed against someone else's flow can never attach to a stranger's account. The handle is single-use and must belong to the same account that started the flow.",
         "requestBody": {
           "required": true,
           "content": {
