@@ -402,8 +402,10 @@
           "401": {
             "description": "`SESSION_EXPIRED` — the refresh token is unknown, expired or already used; sign in again",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } },
-              "example": { "code": "SESSION_EXPIRED", "message": "Session expired or already refreshed — sign in again" }
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" },
+                "example": { "code": "SESSION_EXPIRED", "message": "Session expired or already refreshed — sign in again" }
+              }
             }
           }
         }
