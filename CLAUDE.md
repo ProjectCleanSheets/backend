@@ -100,6 +100,34 @@ Two token kinds, and the distinction matters (task 19):
 Never trust the user ID from the request body: identity always comes from the
 verified token.
 
+### Two Google OAuth clients — read this before debugging a rejected sign-in
+The same Google project holds **two** OAuth clients, doing different jobs:
+
+- **Web client** (`GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` + `GOOGLE_REDIRECT_URI`)
+  — the server-side Sheets consent flow. Only a web client can have a secret and a
+  redirect URI.
+- **iOS client** (`GOOGLE_IOS_CLIENT_ID`) — what the app's native Sign in with
+  Google uses (`GIDClientID` in its Info.plist). It has no secret.
+
+A Google ID token's `aud` is **whichever client minted it**. So the app's sign-in
+tokens carry the *iOS* client id, and `verifyGoogleToken` must accept both — it
+passes `googleAudiences()` (an array) to `verifyIdToken`. Neither id is a secret;
+the iOS one ships inside the app binary.
+
+**The trap, and why this is written down** (task 21 / ledger CR-04): when the
+audience does not match, `POST /api/auth/session` answers
+**`401 GOOGLE_TOKEN_EXPIRED "Missing or invalid identity token"`**. That code is a
+catch-all for *"we could not verify this token"* — it does **not** mean the token
+expired. `verifyGoogleToken` swallows the underlying exception and returns `null`,
+so the real reason never reaches the logs or the client.
+
+If sign-in from a client 401s here, check the audience **first**: decode the
+token's payload (`aud`) and compare it against `GOOGLE_CLIENT_ID` and
+`GOOGLE_IOS_CLIENT_ID`. A new client — Android, a second iOS target, a staging
+app — needs adding to `googleAudiences()` or it will fail exactly this way, and
+the error text will point at the wrong thing. Symptoms that look like a network or
+token-lifetime problem but reproduce *every single time* are almost always this.
+
 ## Security Requirements
 This backend handles financial data. Every task must satisfy these; task 09 audits them
 before production use.
@@ -184,8 +212,9 @@ Set in Vercel dashboard. Never hardcode secrets.
 ```
 SUPABASE_URL                   — production project on Vercel; the cleansheets-dev project in local .env
 SUPABASE_SERVICE_ROLE_KEY      — server-side only; RLS is enabled, anon key cannot access tables
-GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_ID               — the WEB OAuth client: server-side Sheets consent, and an accepted sign-in audience
 GOOGLE_CLIENT_SECRET
+GOOGLE_IOS_CLIENT_ID           — the iOS OAuth client the app signs in with; its ID tokens carry this as `aud`. Optional (unset = web client only), but sign-in from the app 401s without it. Not a secret — it ships in the app binary. See Authentication
 GOOGLE_REDIRECT_URI            — optional; defaults to production callback, set to localhost in Development
 APPLE_CLIENT_ID                — Sign in with Apple audience: the app's Apple client id (iOS bundle id, or Services ID for web). Apple identity tokens are accepted only when `aud` matches. Required for Apple login (task 16)
 ENABLE_BANKING_APP_ID

@@ -131,6 +131,17 @@ never happen.
 | `POST /api/auth/session/refresh` | `SESSION_EXPIRED` | Session is over (unknown, expired, already-used token, or the account was deleted) → run native sign-in and exchange again (§4.1). |
 | `POST /api/auth/session` | `GOOGLE_TOKEN_EXPIRED` | The identity token itself was rejected → re-run native sign-in. |
 
+> **`GOOGLE_TOKEN_EXPIRED` on the exchange does not mean "expired".** It is the
+> catch-all for *"we could not verify this identity token"*, and the underlying
+> reason is deliberately not leaked to the client. If sign-in from a client fails
+> here **every single time** — rather than intermittently, as a real expiry would
+> — the cause is almost certainly an **audience mismatch**: the token's `aud` is
+> whichever OAuth client minted it, and the backend accepts only its configured
+> set (the web client plus, for the app, the iOS client). A new client — Android,
+> a second iOS target, a staging build — must be added backend-side or it fails
+> exactly this way. Do not chase the network or token lifetimes first; decode the
+> token and compare `aud`. (Backend task 21 / ledger CR-04.)
+
 Deleting the account (`DELETE /api/user/account`) invalidates every device's
 refresh token immediately; the current access token keeps verifying until it
 expires but has no data left to reach. Sign out locally right after.

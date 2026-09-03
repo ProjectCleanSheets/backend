@@ -103,14 +103,41 @@ function detectProvider(token: string): AuthProvider | null {
   return null;
 }
 
-/** Returns the verified Google `sub`, or null if the token is not valid for us. */
-async function verifyGoogleToken(idToken: string): Promise<string | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId) {
+/**
+ * Every OAuth client of ours whose ID tokens we accept at sign-in.
+ *
+ * Two, because the same Google project has two clients doing different jobs:
+ *
+ * - `GOOGLE_CLIENT_ID` is the **web** client. It is paired with a secret and a
+ *   redirect URI and drives the server-side Sheets consent flow.
+ * - `GOOGLE_IOS_CLIENT_ID` is the **iOS** client the app signs in with. Its
+ *   tokens carry `aud = <ios client id>`, so verifying only against the web
+ *   client rejected every single sign-in from the app (401
+ *   GOOGLE_TOKEN_EXPIRED) — the bug this list exists to fix.
+ *
+ * Neither id is a secret; the iOS one ships inside the app binary. Optional, so
+ * an unset `GOOGLE_IOS_CLIENT_ID` simply keeps the previous single-audience
+ * behaviour instead of breaking the web flow.
+ */
+function googleAudiences(): string[] {
+  const web = process.env.GOOGLE_CLIENT_ID;
+  if (!web) {
     throw new Error('GOOGLE_CLIENT_ID is not set');
   }
+  const ios = process.env.GOOGLE_IOS_CLIENT_ID;
+  return ios ? [web, ios] : [web];
+}
+
+/** Returns the verified Google `sub`, or null if the token is not valid for us. */
+async function verifyGoogleToken(idToken: string): Promise<string | null> {
   try {
-    const ticket = await verifierClient.verifyIdToken({ idToken, audience: clientId });
+    // `audience` takes an array: the token must match *one* of our clients. This
+    // widens the accepted set, it does not weaken the check — a token minted for
+    // anyone else's client is still rejected.
+    const ticket = await verifierClient.verifyIdToken({
+      idToken,
+      audience: googleAudiences(),
+    });
     return ticket.getPayload()?.sub ?? null;
   } catch {
     return null;
