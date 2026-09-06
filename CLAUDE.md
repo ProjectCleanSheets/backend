@@ -74,6 +74,25 @@ backend/
 
 Free tier enforcement is NOT implemented in this release. Skip it entirely.
 
+## Running locally (the iOS app depends on this)
+```bash
+cd backend        # ← MUST be this directory, not the project root
+vercel dev        # http://localhost:3000
+```
+`vercel dev` serves whatever directory it is launched in. The project root holds
+only `app/` and `backend/` — **no `api/` folder** — so a root-launched server
+answers **404 to every `/api/*` path** while still printing "Ready! Available at
+http://localhost:3000". The iOS app's Debug build points at this port, so the
+whole app then fails with `HTTP_404` on every call and the bug looks like it is
+client-side. It is not.
+
+Health check (no token needed):
+```bash
+curl -s -i localhost:3000/api/auth/bank/status | head -1
+# 401 → serving correctly  ({"code":"GOOGLE_TOKEN_EXPIRED", ...})
+# 404 → wrong directory, restart from backend/
+```
+
 ## Tech Stack
 - Language: TypeScript (all code, including `api/` functions — Vercel compiles `.ts` natively)
 - Runtime: Node.js on Vercel serverless functions
