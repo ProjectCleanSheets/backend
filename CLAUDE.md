@@ -19,12 +19,29 @@ Work the **app** needs from this backend (and vice versa) is tracked in
 repos, that both agents read and write directly. It is separate from `TASKS.md`
 (this repo's own board) and from `openapi.json` (the API contract).
 
-At the **start of every session, read that file.** If it has an `OPEN` entry
-directed `→ backend`, you own it: file it on this board (`TASKS.md` + a `tasks/`
-file) and mark it `ACCEPTED`, or do it now if small. When you finish, set the
-entry `DONE`, note anything the app side must then do (re-copy the contract, etc.),
-and move it to the Log. When *you* need something from the app repo, add an entry
-there before proceeding. Full protocol is in the file's header.
+At the **start of every session, read that file — starting with the "Open items"
+table at the top of it.** That table is the whole cross-repo board in one screen,
+and it exists because the list keeps growing: five entries in, the prose below it
+is long enough that skimming reliably misses one. Scan the table, then read only
+the entries it points you at.
+
+If an `OPEN` entry is directed `→ backend`, **you own it**: file it on this board
+(`TASKS.md` + a `tasks/` file) and mark it `ACCEPTED`, or do it now if small. When
+you finish, set the entry `DONE`, note anything the app side must then do (re-copy
+the contract, apply a migration, re-read a doc), and move it to the Log.
+
+When *you* need something from the app repo, add an entry there before proceeding.
+Filing or changing an entry means **updating its row in that table in the same
+edit**, and taking the next free id noted under it.
+
+**Re-read the table before you call a task done** — your work may have resolved
+someone else's entry, and an entry filed mid-task is the easiest one to leave
+dangling. Full protocol is in the file's header.
+
+**Currently open and directed at you:** CR-05 (confirm Danske Bank's exact Enable
+Banking ASPSP name from a *production* application — blocks the app's first
+production build, nothing before it) and CR-02 (sheet-list endpoint + Drive scope —
+blocks app task 11). The table is authoritative if this paragraph goes stale.
 
 ## Git Workflow
 The owner reviews every change before it enters git history:
