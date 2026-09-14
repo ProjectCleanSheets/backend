@@ -194,6 +194,19 @@ an expired consent can only be fixed by re-running this flow.
 After this, `hasSheetsAccess` (from `POST /api/auth/google`) becomes true and the
 sheet endpoints in §6 work.
 
+**Scopes** (task 22): the consent asks for `spreadsheets` *and*
+`drive.metadata.readonly`. The Drive scope is what makes `GET /api/sheet/list`
+possible — `spreadsheets` can read and write a sheet whose id you already have,
+but cannot enumerate a Drive to find one. It reads names and ids only, never a
+document's contents.
+
+**A grant cannot gain a scope after the fact.** A refresh token stored before the
+Drive scope existed keeps working for every other sheet endpoint, but
+`GET /api/sheet/list` answers **`401 GOOGLE_TOKEN_EXPIRED`** for it. That is not
+an expired session: it means *re-run this flow*, and the UI should offer
+reconnect rather than an error state. The same 401 covers a revoked grant and a
+user who never connected Google at all — one user action fixes all three.
+
 ### finalize failure cases (both flows)
 
 `finalize` maps to distinct statuses the app should handle:
@@ -227,6 +240,9 @@ endpoints (§4).
 - `POST /api/user/config` — set `sheetId` and/or `columnMapping`.
 
 **Sheet data**
+- `GET  /api/sheet/list` — the connected Google account's spreadsheets
+  (`{ account, sheets: [{ id, name, modifiedTime }] }`, newest first) for the
+  onboarding sheet picker. Needs the Drive scope — see §5.2.
 - `GET  /api/sheet/structure` — tabs + detected category rows for the sheet.
 - `GET  /api/sheet/budget` — budget overview (per-section Budget/Actual + totals).
 - `POST /api/sheet/category` — create a new category row in a section.

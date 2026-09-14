@@ -11,11 +11,11 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **0 pts**.
+Remaining: **2 pts**.
 
 ## In Progress
 
-- (none)
+- [22 — Sheet list endpoint + Drive scope](tasks/22-sheet-list.md) · 2 pts · `feature/22-sheet-list` · picked up from `../CROSS_REPO_LEDGER.md` **CR-02** (app → backend). Adds `drive.metadata.readonly` to the Google consent and a `GET /api/sheet/list` so the app's onboarding screen 4 can show a native sheet picker instead of asking for a pasted URL. Blocks app task **11 — Connect sheet**. **Verified end-to-end through the app 2026-09-14** (23 real spreadsheets listed, chosen id saved); `tsc` green. Owner enabled the Drive API on the Cloud project as part of it. Uncommitted, per this repo's git workflow.
 
 ## Backlog
 

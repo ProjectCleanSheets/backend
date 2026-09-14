@@ -101,6 +101,41 @@
           }
         }
       },
+      "SpreadsheetList": {
+        "type": "object",
+        "description": "The connected Google account's spreadsheets, most recently modified first.",
+        "required": ["account", "sheets"],
+        "properties": {
+          "account": {
+            "type": "string",
+            "nullable": true,
+            "description": "E-mail of the Google account the Sheets consent was granted for. Decoupled from the login account (an Apple login connects whichever Google account owns the budget), so the app shows it to answer \"which account is this?\". Null if Drive reports none.",
+            "example": "alex@gmail.com"
+          },
+          "sheets": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Spreadsheet" }
+          }
+        }
+      },
+      "Spreadsheet": {
+        "type": "object",
+        "required": ["id", "name", "modifiedTime"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Google Sheet ID — send as `sheetId` to POST /api/user/config.",
+            "example": "1AbC-dEfGhIjKlMnOpQrStUvWxYz0123456789abcdef"
+          },
+          "name": { "type": "string", "example": "Budget 2026" },
+          "modifiedTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "RFC 3339 at whole-second precision (Drive's milliseconds are truncated — the generated Swift client's default date transcoder rejects fractional seconds). The list is ordered by this, newest first.",
+            "example": "2026-09-11T20:14:03Z"
+          }
+        }
+      },
       "Transaction": {
         "type": "object",
         "required": ["id", "merchant", "amount", "currency", "date", "direction", "status"],
@@ -922,6 +957,34 @@
           },
           "500": {
             "description": "`SHEET_WRITE_FAILED` (a write failed) or `SUPABASE_ERROR`",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/sheet/list": {
+      "get": {
+        "tags": ["sheet"],
+        "summary": "List the connected Google account's spreadsheets",
+        "description": "Populates the app's onboarding sheet picker. Lists spreadsheets the caller's **connected Google account** can open — most recently modified first, one bounded page, trashed files excluded — plus that account's e-mail. Takes no parameters: the Drive is whichever one the stored consent belongs to.\n\nNeeds the `drive.metadata.readonly` scope, added to the consent in task 22. A refresh token granted **before** that (or a revoked one) answers `401 GOOGLE_TOKEN_EXPIRED` — re-run the Google Sheets consent; a grant cannot gain a scope it was never given.",
+        "responses": {
+          "200": {
+            "description": "The account's spreadsheets",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/SpreadsheetList" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "405": {
+            "description": "Unsupported method",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          },
+          "500": {
+            "description": "Google Drive could not be reached (including: the Drive API is not enabled on the Google project)",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }
