@@ -40,8 +40,8 @@ dangling. Full protocol is in the file's header.
 
 **Currently open and directed at you:** CR-05 (confirm Danske Bank's exact Enable
 Banking ASPSP name from a *production* application — blocks the app's first
-production build, nothing before it) and CR-02 (sheet-list endpoint + Drive scope —
-blocks app task 11). The table is authoritative if this paragraph goes stale.
+production build, nothing before it). CR-02 (sheet-list endpoint + Drive scope) was
+resolved by task 22. The table is authoritative if this paragraph goes stale.
 
 ## Git Workflow
 The owner reviews every change before it enters git history:
@@ -59,6 +59,7 @@ backend/
 │   │   ├── google.ts          — setup state + Google Sheets consent + callback
 │   │   └── bank.ts            — Enable Banking connect + callback + status
 │   ├── sheet/
+│   │   ├── list.ts            — list the connected account's spreadsheets (Drive)
 │   │   ├── structure.ts       — read sheet tabs and category rows
 │   │   ├── save.ts            — write transaction to sheet + _log tab
 │   │   ├── category.ts        — create new category row
@@ -72,7 +73,8 @@ backend/
 │   ├── auth.ts                — request authentication + identity-token sign in
 │   ├── session.ts             — backend access/refresh token mint, verify, rotate
 │   ├── supabase.ts            — Supabase client singleton
-│   ├── sheets.ts              — Google Sheets API helper
+│   ├── sheets.ts              — Google Sheets API helper (+ the shared Google OAuth client)
+│   ├── drive.ts               — Google Drive API helper (metadata only: the sheet picker's list)
 │   ├── enablebanking.ts       — Enable Banking API helper
 │   └── crypto.ts              — token encryption/decryption
 ├── supabase/migrations/       — SQL migrations
@@ -87,6 +89,10 @@ backend/
 1. Google OAuth — sign in, token exchange, refresh token management
 2. Enable Banking OAuth — bank connection consent flow, token management
 3. Google Sheets API — read current Actual cell value, add amount, write back, write to `_log` tab
+   — plus Google **Drive** (`drive.metadata.readonly`, task 22) for one thing only: listing the
+   account's spreadsheets so the app's onboarding picker has something to show. Names and ids,
+   never a document's contents. **The Drive API must be enabled on the Google Cloud project**, or
+   every call 403s `SERVICE_DISABLED` (mapped to a 500 — a deployment fault, not a user reconnect)
 4. Supabase — store and retrieve user config (sheet ID, column mapping, encrypted tokens)
 
 Free tier enforcement is NOT implemented in this release. Skip it entirely.

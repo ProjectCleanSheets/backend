@@ -19,7 +19,18 @@ const REDIRECT_URI =
 // Deep link the iOS app's ASWebAuthenticationSession listens on.
 const APP_CALLBACK = 'cleansheets://oauth/google';
 // Sheets scope: the stored refresh token must be able to call the Sheets API (task 03).
-const OAUTH_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/spreadsheets'];
+// Drive metadata scope (task 22): `spreadsheets` can read and write a sheet whose id
+// you already have, but it cannot *find* one — GET /api/sheet/list needs Drive to
+// enumerate the account's spreadsheets for the app's picker. `metadata.readonly` is
+// the narrowest scope that can: names and ids, never a document's contents. It is
+// Google-"sensitive", so the OAuth app needs verification before public launch —
+// test users can grant it today (ledger CR-02).
+const OAUTH_SCOPES = [
+  'openid',
+  'email',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+];
 
 const finalizeSchema = z.object({
   handle: z.string().min(1).max(HANDLE_MAX_LENGTH),

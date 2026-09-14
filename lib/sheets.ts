@@ -5,6 +5,13 @@ import { getSupabase } from './supabase';
 
 export type Sheets = sheets_v4.Sheets;
 
+// The OAuth client type, taken from `google.auth` rather than from
+// google-auth-library directly: googleapis-common bundles its own copy of that
+// package, and the two OAuth2Client declarations are structurally incompatible
+// (private fields), so the top-level one does not typecheck against sheets() or
+// drive(). Same reason the constructor below is `google.auth.OAuth2`.
+export type GoogleAuthClient = InstanceType<typeof google.auth.OAuth2>;
+
 // What values.get returns per cell with UNFORMATTED_VALUE rendering.
 export type CellValue = string | number | boolean;
 
@@ -25,12 +32,16 @@ export class SheetsError extends Error {
 }
 
 /**
- * Builds a Sheets client authenticated as the given user via their stored
+ * Builds an OAuth client authenticated as the given user via their stored
  * encrypted refresh token. google-auth-library mints and refreshes access
  * tokens automatically; a revoked or expired grant surfaces as
  * GOOGLE_TOKEN_EXPIRED on the first API call.
+ *
+ * Shared with `lib/drive.ts` (task 22) rather than duplicated: this is the one
+ * place a refresh token is decrypted, and a second copy of it is the kind of
+ * thing that drifts.
  */
-export async function getSheetsForUser(userId: string): Promise<Sheets> {
+export async function getGoogleAuthForUser(userId: string): Promise<GoogleAuthClient> {
   const { data, error } = await getSupabase()
     .from('users')
     .select('google_refresh_token')
@@ -51,11 +62,14 @@ export async function getSheetsForUser(userId: string): Promise<Sheets> {
   if (!clientId || !clientSecret) {
     throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set');
   }
-  // googleapis bundles its own google-auth-library; using google.auth.OAuth2
-  // keeps the client type compatible with the sheets() options.
   const auth = new google.auth.OAuth2(clientId, clientSecret);
   auth.setCredentials({ refresh_token: decryptToken(data.google_refresh_token) });
-  return google.sheets({ version: 'v4', auth });
+  return auth;
+}
+
+/** The Sheets client for the given user. */
+export async function getSheetsForUser(userId: string): Promise<Sheets> {
+  return google.sheets({ version: 'v4', auth: await getGoogleAuthForUser(userId) });
 }
 
 // Maps a googleapis (GaxiosError-shaped) failure to a SheetsError. Only the
