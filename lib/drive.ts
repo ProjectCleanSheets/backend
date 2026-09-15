@@ -1,5 +1,6 @@
 import { drive_v3, google } from 'googleapis';
 import { SheetsError, getGoogleAuthForUser } from './sheets';
+import { toWholeSecondISO } from './time';
 
 export type Drive = drive_v3.Drive;
 
@@ -59,26 +60,6 @@ export async function listSpreadsheets(drive: Drive): Promise<SpreadsheetInfo[]>
   } catch (err) {
     throw toDriveError(err, 'listing spreadsheets');
   }
-}
-
-/**
- * RFC 3339 at **whole-second** precision, which is what the app can actually
- * parse. Drive answers `2026-09-11T20:14:03.000Z`, and the iOS client decodes
- * `format: date-time` with swift-openapi-runtime's default transcoder — a bare
- * `ISO8601DateFormatter`, i.e. `.withInternetDateTime` and **no fractional
- * seconds**. Handing it the milliseconds fails the decode of the whole response,
- * so the picker would come up empty for a reason nothing in either repo would
- * point at. Truncating here keeps the contract's `date-time` fields decodable by
- * the default configuration on both sides.
- *
- * Returns '' for a missing or unparseable value; the caller drops that file.
- */
-function toWholeSecondISO(value: string | null | undefined): string {
-  const ms = value ? Date.parse(value) : Number.NaN;
-  if (Number.isNaN(ms)) {
-    return '';
-  }
-  return new Date(Math.floor(ms / 1000) * 1000).toISOString().replace(/\.000Z$/, 'Z');
 }
 
 /**

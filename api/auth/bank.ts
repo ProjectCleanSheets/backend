@@ -16,6 +16,7 @@ import {
   mintPendingGrant,
 } from '../../lib/pendinggrants';
 import { getSupabase } from '../../lib/supabase';
+import { toWholeSecondISO } from '../../lib/time';
 
 // Deep link the iOS app's ASWebAuthenticationSession listens on.
 const APP_CALLBACK = 'cleansheets://oauth/bank';
@@ -268,7 +269,12 @@ async function handleFinalize(req: VercelRequest, res: VercelResponse): Promise<
     return sendError(res, 500, 'SUPABASE_ERROR', 'Database write failed while storing bank credentials');
   }
 
-  res.status(200).json({ status: 'connected', expiresAt: valid_until });
+  // Whole seconds on the way out (lib/time.ts): the app decodes this field with a
+  // transcoder that takes no fractional part, and a `date-time` failure fails the
+  // whole response. What was stored stays exactly as Enable Banking sent it —
+  // only what the client is handed is normalised, and a value too malformed to
+  // parse falls through verbatim rather than being hidden behind an empty string.
+  res.status(200).json({ status: 'connected', expiresAt: toWholeSecondISO(valid_until) || valid_until });
 }
 
 export interface BankStatus {
@@ -282,8 +288,13 @@ export interface BankStatus {
  * connected, or no expiry stored) reports as expired — from Settings' point of
  * view the fix is the same: (re)connect the bank.
  */
-export function computeBankStatus(expiresAt: string | null, now: number): BankStatus {
-  const expiryMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+export function computeBankStatus(storedExpiry: string | null, now: number): BankStatus {
+  const expiryMs = storedExpiry ? new Date(storedExpiry).getTime() : Number.NaN;
+  // Whole seconds on the way out (lib/time.ts) — a row written before task 23,
+  // or one Enable Banking echoed back with milliseconds of its own, is still
+  // decodable by the app. '' means there was nothing parseable to serve, which
+  // is the same answer as no consent at all, and reports below as `expired`.
+  const expiresAt = toWholeSecondISO(storedExpiry) || null;
   if (Number.isNaN(expiryMs) || expiryMs <= now) {
     return { status: 'expired', expiresAt, renewAvailable: true };
   }

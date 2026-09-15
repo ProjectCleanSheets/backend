@@ -645,7 +645,7 @@
                       "type": "string",
                       "format": "date-time",
                       "nullable": true,
-                      "description": "Consent expiry (`valid_until`); null when no bank connection is stored"
+                      "description": "Consent expiry (`valid_until`) at whole-second precision (a stored value's milliseconds are truncated — the generated Swift client's default date transcoder rejects fractional seconds); null when no bank connection is stored"
                     },
                     "renewAvailable": { "type": "boolean" }
                   }
@@ -699,7 +699,7 @@
                     "expiresAt": {
                       "type": "string",
                       "format": "date-time",
-                      "description": "Consent expiry (`valid_until`)"
+                      "description": "Consent expiry (`valid_until`) at whole-second precision, as on GET /api/auth/bank/status"
                     }
                   }
                 },

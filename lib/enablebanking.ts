@@ -1,5 +1,6 @@
 import { createSign } from 'node:crypto';
 import { MS_PER_DAY } from './constants';
+import { toWholeSecondISO } from './time';
 
 // Enable Banking serves sandbox and production from the same base URL; the
 // environment is a property of the registered application (app ID + key pair).
@@ -193,7 +194,12 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 export async function startAuthSession(state: string, aspsp: Aspsp): Promise<string> {
   const validUntil = new Date(Date.now() + consentValidityDays() * MS_PER_DAY);
   const data = await post<{ url: string }>('/auth', {
-    access: { valid_until: validUntil.toISOString() },
+    // Whole seconds, because `exchangeCode` stores whatever Enable Banking
+    // echoes back and the app cannot decode a fractional `date-time` (see
+    // lib/time.ts). `Date.now()` carries milliseconds ~999 times in 1000, so
+    // requesting a truncated instant makes a verbatim echo harmless instead of
+    // relying on Enable Banking to round it for us.
+    access: { valid_until: toWholeSecondISO(validUntil) },
     aspsp,
     redirect_url: REDIRECT_URI,
     state,
