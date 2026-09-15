@@ -51,3 +51,17 @@
 > the Security Requirements and Task Board sections. Tasks 01–03 are already built;
 > compose `lib/enablebanking.ts` and `lib/sheets.ts` — do not duplicate their logic.
 > Implement task `tasks/04-transactions.md` exactly as scoped. When done, update TASKS.md.
+
+## Re-seeding the sandbox data (added 2026-09-15)
+
+The Mock ASPSP's transactions carry literal dates and never move, while this
+endpoint only asks for the last **30 days** — so the seeded data ages out and the
+queue silently returns **200 with zero transactions**. When that happens:
+
+```bash
+node scripts/seed-mock-aspsp.mjs      # writes an import-ready file with today's dates
+```
+
+then import it at enablebanking.com → control panel → **Mock ASPSP**, and
+**re-run the bank consent** (the import creates a new account; the stored session
+keeps pointing at the old one and starts answering 400). See `tasks/25-seed-mock-aspsp.md`.
