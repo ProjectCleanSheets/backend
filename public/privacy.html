@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — CleanSheets</title>
+<link rel="stylesheet" href="/_style.css">
+</head>
+<body>
+<main>
+  <p class="brand">CleanSheets</p>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated 10 October 2026</p>
+
+  <p>CleanSheets is a personal budgeting app. It reads the transactions on a bank
+  account you connect, lets you file each one into a category, and writes the
+  amount into a Google Sheet that you own. This page describes exactly what data
+  that involves, where it goes, and how to get rid of it.</p>
+
+  <div class="card">
+    <p><strong>The short version.</strong> Your bank access is read-only. Your
+    spreadsheet stays yours and is never deleted by us. Nothing is sold, shared
+    for advertising, or used to build a profile of you. There is no analytics or
+    tracking in the app.</p>
+  </div>
+
+  <h2>Who is responsible</h2>
+  <p>CleanSheets is operated by its developer as an individual. For any question
+  about your data, including access or deletion, write to
+  <a href="mailto:k.danilovs2905@gmail.com">k.danilovs2905@gmail.com</a>.</p>
+
+  <h2>What data is involved</h2>
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Your Google account identity — email address and account identifier</td>
+        <td>To sign you in and to know which spreadsheet and bank connection are yours.</td>
+      </tr>
+      <tr>
+        <td>A list of your Google Drive spreadsheets — names and identifiers only</td>
+        <td>So you can choose which spreadsheet to use. The contents of other files are never read.</td>
+      </tr>
+      <tr>
+        <td>The contents of the one spreadsheet you choose</td>
+        <td>To read your categories and budgets, and to add amounts to the Actual column when you file a transaction.</td>
+      </tr>
+      <tr>
+        <td>Your bank account and its recent transactions — merchant, amount, date, status</td>
+        <td>To show you what is waiting to be categorised. Access is read-only; no payment can be initiated.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Where it is stored</h2>
+  <ul>
+    <li><strong>On the server:</strong> your account record, your chosen spreadsheet
+      and column settings, an encrypted Google authorisation token, and your bank
+      session reference.</li>
+    <li><strong>On your phone:</strong> sign-in tokens in the iOS Keychain, a cache
+      of your transaction queue and categories, and your own app settings such as
+      reminder time. This is a cache — the authoritative copies are your bank and
+      your spreadsheet.</li>
+  </ul>
+  <p><strong>Transaction data is not stored on the server.</strong> It is fetched
+  from your bank when the app asks, passed to the app, and not retained.</p>
+
+  <h2>Who else is involved</h2>
+  <p>Four service providers process data on our behalf, and no one else receives it:</p>
+  <ul>
+    <li><strong>Google</strong> — sign-in, and reading and writing your chosen spreadsheet.</li>
+    <li><strong>Enable Banking</strong> — the regulated connection to your bank under PSD2.</li>
+    <li><strong>Supabase</strong> — the database holding the account record described above.</li>
+    <li><strong>Vercel</strong> — hosting for the service.</li>
+  </ul>
+  <p>Your data is not sold, rented, or used for advertising, and it is not shared
+  with anyone else.</p>
+
+  <h2>Your bank connection</h2>
+  <p>The connection is made through Enable Banking under PSD2, using your bank's
+  own login and strong authentication. We never see your bank credentials. The
+  consent is <strong>read-only</strong> and expires on a schedule your bank sets —
+  typically 90 days — after which you must renew it deliberately. You can revoke
+  it at any time, in the app or with your bank.</p>
+
+  <h2>Your spreadsheet</h2>
+  <p>The app writes to one spreadsheet you choose: it adds amounts to the Actual
+  column of the categories you pick, and keeps a hidden <code>_log</code> tab
+  recording what it filed, so the same transaction is never counted twice. It
+  never edits your category names, your budgets, or any other file in your Drive.</p>
+
+  <h2>Deleting your data</h2>
+  <p>Settings → Delete account removes your account and everything stored about
+  you on the server, and clears the app's data from your phone. We also attempt
+  to revoke the Google and bank authorisations.</p>
+  <p><strong>Your spreadsheet is deliberately not deleted</strong>, including its
+  hidden <code>_log</code> tab. It is your own document, and it stays in your
+  Google Drive exactly as it is. Deleting it is yours to do, if you want to.</p>
+
+  <h2>Your rights</h2>
+  <p>Under the GDPR you may request access to your data, correction, erasure,
+  restriction of processing, or a copy in portable form, and you may object to
+  processing. Email the address above and you will get an answer. You also have
+  the right to complain to your national data protection authority — in Denmark,
+  Datatilsynet.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes materially, the date at the top changes and the new
+  version replaces this page.</p>
+
+  <footer>
+    CleanSheets · <a href="/terms">Terms of Service</a> ·
+    <a href="mailto:k.danilovs2905@gmail.com">k.danilovs2905@gmail.com</a>
+  </footer>
+</main>
+</body>
+</html>
