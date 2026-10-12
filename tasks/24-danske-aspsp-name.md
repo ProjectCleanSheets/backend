@@ -70,13 +70,33 @@ is signed, and real-bank access needs TPP licensing / eIDAS certificates (or
 Enable Banking acting as agent). Worth confirming where the project stands on
 that before the launch checklist assumes production access is a formality.
 
+## Answered — 2026-10-12
+
+```
+name: "Danske Bank"   psu_types: ["personal","business"]
+```
+
+Read from `GET /aspsps?country=DK` on a **production** application
+(`d68013c4-50f9-4f6f-8155-8fcdf490eddf`), activated in restricted mode by linking
+the owner's own account — no contract and no TPP licence required for that path.
+
+**The guess was right.** `BANK_ASPSP_NAME = Danske Bank` in
+`app/CleanSheets/Config/Release.xcconfig` is correct and needs no change. Danske
+is listed **once**, not split by segment, and the single entry serves both
+`personal` and `business` — so the app never has to choose one.
+
+**And the diagnosis held exactly.** Production lists **96** Danish ASPSPs; the
+sandbox application listed **6**. Danske's absence was the environment, as this
+task argued from the start.
+
 ## Acceptance criteria
 
-- [ ] The exact production ASPSP name for Danske Bank DK (personal), **or** a
-      written statement of what stands in the way of getting it.
-- [ ] If obtained: `BANK_ASPSP_NAME` updated in the app repo and the ledger entry
-      resolved with the value.
-- [ ] Optional: `+` normalised to a space in the `bank` query parameter.
+- [x] The exact production ASPSP name for Danske Bank DK (personal) — `Danske Bank`.
+- [x] `BANK_ASPSP_NAME` confirmed correct in the app repo; ledger **CR-05** resolved
+      with the value.
+- [ ] Optional: `+` normalised to a space in the `bank` query parameter — still
+      worth doing, and now demonstrably live ammunition: the confirmed name
+      contains a space.
 
 ## Blocks
 
