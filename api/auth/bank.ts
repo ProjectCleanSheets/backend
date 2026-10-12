@@ -38,7 +38,25 @@ const finalizeSchema = z.object({
 // Bank selection: optional in sandbox (defaults to Mock ASPSP), required in
 // production where the app passes the user's bank.
 const startQuerySchema = z.object({
-  bank: z.string().min(1).max(MAX_BANK_NAME_LENGTH).optional(),
+  // `+` is decoded as a space before the name reaches Enable Banking.
+  //
+  // The query parser in front of this schema does not treat `+` as a space, so
+  // `?bank=Danske+Bank` arrives — and is forwarded — as the literal string
+  // "Danske+Bank", which earns a 422 "Wrong ASPSP name provided" from Enable
+  // Banking and a 400 from here. The iOS app sends `%20` (pinned by a test), so
+  // nothing is broken today; this removes the trap for any other client.
+  //
+  // Not theoretical: the production ASPSP name confirmed by task 24 is
+  // `Danske Bank`, and every Danish bank in that listing has a space in it.
+  //
+  // Trimmed after decoding so `?bank=+` becomes empty and is refused here with a
+  // 400, rather than being forwarded as a lone space for Enable Banking to
+  // reject with a 422 the user cannot act on.
+  bank: z
+    .string()
+    .transform((value) => value.replace(/\+/g, ' ').trim())
+    .pipe(z.string().min(1).max(MAX_BANK_NAME_LENGTH))
+    .optional(),
   country: z
     .string()
     .regex(/^[A-Z]{2}$/, 'country must be a two-letter ISO code like "DK"')
