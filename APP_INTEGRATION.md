@@ -176,11 +176,27 @@ Use `ASWebAuthenticationSession` for the browser step, with callback scheme
 4. `POST /api/auth/bank/finalize` (Bearer) with `{ "handle": "<handle>" }`.
    → `{ "status": "connected", "expiresAt": "<ISO8601>" }`
 
-Then check health anytime with `GET /api/auth/bank/status` →
+Then check the consent's **stored expiry** anytime with
+`GET /api/auth/bank/status` →
 `{ status: "healthy" | "expiring" | "expired", expiresAt, renewAvailable }`.
-Show a reconnect/renew affordance when `renewAvailable` is true (`expiring` within
-14 days of expiry, or already `expired`). Enable Banking issues no refresh token —
-an expired consent can only be fixed by re-running this flow.
+
+⚠️ **`healthy` describes a date, not a working connection.** This endpoint reads
+`bank_token_expiry` and does date arithmetic; Enable Banking is never asked
+anything. A consent can be well inside its window and completely unusable — the
+account behind it closed or replaced — and this will still say `healthy`.
+Observed on a real account for twelve days (ledger CR-09). Checking the session
+does not help: it reports `AUTHORIZED` with the account listed, and only a fetch
+reveals the failure.
+
+**`GET /api/transactions` is the only call that uses the bank, so it is the only
+evidence of real health.** A failure there should outrank this status in the UI.
+
+`renewAvailable` is **advisory, not enforced** — `GET /api/auth/bank` never
+consults it. Offer the (re)connect affordance when it is true (`expiring` within
+14 days, or already `expired`) **and also whenever a fetch has actually failed**,
+since a consent pointing at a dead account cannot expire its way into being
+repairable. Enable Banking issues no refresh token — an expired consent can only
+be fixed by re-running this flow.
 
 ### 5.2 Google Sheets connection
 
