@@ -267,7 +267,45 @@ ENABLE_BANKING_CONSENT_DAYS    — optional, DEV ONLY: consent validity in days 
 ENCRYPTION_KEY                 — AES-256-GCM key for encrypting tokens in Supabase
 ```
 
-Switching from sandbox to production is purely an `ENABLE_BANKING_ENV` change. No code changes required.
+### Where to set them — two traps that each cost a session
+
+**`vercel dev` reads `backend/.env`, not `.env.local`** — the opposite of the
+usual Vercel convention. Both files exist and overlap, and the failure is quiet:
+edit `.env.local`, restart, and the server keeps serving the old value from
+`.env`, so a rotated credential looks like it worked while the old one is still
+in play (2026-10-24). **Change secrets in `.env`, and keep `.env.local` in step
+so the two cannot disagree.** Do not delete `.env` as "redundant": it carries
+`GOOGLE_IOS_CLIENT_ID`, and without it every iOS sign-in is refused with
+`401 GOOGLE_TOKEN_EXPIRED` — CR-04's symptom from a different cause.
+
+**A variable must be set on every Vercel target that needs it.** They are
+per-target (Production / Preview / Development), and a var present on one is
+*absent* on the others. Production had no `GOOGLE_IOS_CLIENT_ID` or
+`APPLE_CLIENT_ID` until 2026-10-25, so the first real sign-in against production
+failed exactly as it had in dev two days earlier. Check with `vercel env ls`,
+which lists the target beside each name.
+
+**Vercel will not show you a value back.** `vercel env pull` returns
+`[SENSITIVE]` for encrypted vars (older CLIs returned an empty string, which
+looks like a misconfiguration and is not). You can write them and verify
+behaviour; you cannot read them.
+
+### Sandbox → production
+
+Not "purely an `ENABLE_BANKING_ENV` change", as this file used to claim. The
+production application is a **different application** with its own credentials,
+so all three move together:
+
+- `ENABLE_BANKING_APP_ID` → the production app's id
+- `ENABLE_BANKING_PRIVATE_KEY` → that app's PEM (a different key pair)
+- `ENABLE_BANKING_ENV` → anything other than `sandbox`, which only controls
+  whether `defaultAspsp()` supplies the Mock ASPSP
+
+The production app must also have the **https** callback registered in Enable
+Banking's control panel — it redirects to the URL registered on the
+*application*, not the one the request asks for, and production rejects
+`http://localhost` outright. Done 2026-10-25: Production uses the production
+app, Preview stays on the sandbox app against `cleansheets-dev`.
 
 ## Token Encryption
 Before implementing, research current best practices for encrypting OAuth tokens stored in Supabase with Node.js on Vercel. Use AES-256-GCM with `ENCRYPTION_KEY` env var (see Security Requirements). The crypto helper lives in `lib/crypto.ts`.
