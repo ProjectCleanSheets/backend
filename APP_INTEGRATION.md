@@ -301,9 +301,10 @@ show `message` only as a fallback. Codes:
 
 ## 8. Product rules the UI must respect
 
-- **Pending transactions are included** in `GET /api/transactions`, marked
-  `status: "pending"`, so a purchase can be categorized immediately. Accepted
-  trade-off: the saved amount may drift from the finally booked amount, and rarely
+- **Pending transactions are included** in `GET /api/transactions` when the bank
+  publishes them, marked `status: "pending"`. **Danske Bank publishes none**
+  (verified 2026-10-25), so with Danske the queue only shows booked transactions,
+  1–4 days after the purchase. Accepted trade-off when a bank does publish them: the saved amount may drift from the finally booked amount, and rarely
   a booked transaction reappears under a new id. Reconciliation is V2. When saving,
   pass the transaction's `status` (`"booked"`/`"pending"`) through to
   `POST /api/sheet/save` — it affects deduplication.

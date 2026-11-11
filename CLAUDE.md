@@ -38,10 +38,7 @@ edit**, and taking the next free id noted under it.
 someone else's entry, and an entry filed mid-task is the easiest one to leave
 dangling. Full protocol is in the file's header.
 
-**Currently open and directed at you:** CR-05 (confirm Danske Bank's exact Enable
-Banking ASPSP name from a *production* application — blocks the app's first
-production build, nothing before it). CR-02 (sheet-list endpoint + Drive scope) was
-resolved by task 22. The table is authoritative if this paragraph goes stale.
+The ledger's "Open items" table is the only list of what is open — do not copy it here.
 
 ## Git Workflow
 The owner reviews every change before it enters git history:
@@ -223,6 +220,16 @@ a booked transaction reappears under a new id. Reconciliation is deferred to V2 
 see `tasks/04-transactions.md` for details. Do not change this behavior without a
 new product decision.
 
+**But Danske Bank publishes none** (verified 2026-10-25 against production, app task
+49: `transaction_status=PDNG` returns 200 with zero entries while the reservation is
+visible in Danske's own app). For the only bank in use, the queue fills 1–4 days after
+a purchase. Catching a spend when it happens is Phase 2 work on the phone side
+(`../TESTING-1.0.md` #2/#4), not something this endpoint can fix.
+
+**Every bank call is "unattended" today.** `lib/enablebanking.ts` sends no PSU headers
+(`Psu-Ip-Address`, `Psu-User-Agent`), so banks count each fetch against the PSD2 limit
+of 4 unattended accesses per day — likely the cause of `../TESTING-1.0.md` #3.
+
 ## Sheet Column Mapping
 Default columns (user-configurable, stored in Supabase):
 - Column F — category names
@@ -352,7 +359,7 @@ Before making changes, always read:
 - `lib/enablebanking.ts` — understand the API auth pattern
 
 ## External Documentation
-- Enable Banking App ID: `aa4b88a1-8b11-4065-881c-44a4435887e0`
+- Enable Banking App IDs: sandbox `aa4b88a1-8b11-4065-881c-44a4435887e0` (Preview + local dev); production `d68013c4-50f9-4f6f-8155-8fcdf490eddf` (Vercel Production, restricted mode: only the owner's linked accounts)
 - Enable Banking sandbox redirect: `https://backend-beryl-phi-32.vercel.app/auth/bank/callback`
 - Google OAuth redirect: `https://backend-beryl-phi-32.vercel.app/auth/google/callback`
 - Vercel URL: `https://backend-beryl-phi-32.vercel.app`
