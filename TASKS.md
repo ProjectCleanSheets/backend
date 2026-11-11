@@ -29,6 +29,12 @@ task until it has a task file and a Backlog line here.
 ## Done
 Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
+### Phase 2
+
+- (none yet)
+
+### V1 — up to 2026-10-21
+
 - [28 — A homepage, so the OAuth consent screen can be published](tasks/28-homepage.md) · 1 pt · 2026-10-21
 - [26 — Privacy policy and terms, served from the backend](tasks/26-legal-pages.md) · 1 pt · 2026-10-12
 - [27 — `+` in the `bank` query parameter must mean a space](tasks/27-bank-query-plus-encoding.md) · 1 pt · 2026-10-12
