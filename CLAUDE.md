@@ -224,7 +224,7 @@ new product decision.
 49: `transaction_status=PDNG` returns 200 with zero entries while the reservation is
 visible in Danske's own app). For the only bank in use, the queue fills 1–4 days after
 a purchase. Catching a spend when it happens is Phase 2 work on the phone side
-(`../TESTING-1.0.md` #2/#4), not something this endpoint can fix.
+(`../TESTING-1.0.md` #4), not something this endpoint can fix.
 
 **Every bank call is "unattended" today.** `lib/enablebanking.ts` sends no PSU headers
 (`Psu-Ip-Address`, `Psu-User-Agent`), so banks count each fetch against the PSD2 limit
