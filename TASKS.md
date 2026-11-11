@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **5 pts.**
+Remaining: **8 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -24,6 +24,7 @@ task until it has a task file and a Backlog line here.
 
 ## Backlog
 
+- [29 — Find out why a refresh returns stale bank data, and fix it](tasks/29-bank-fetch-freshness.md) · 3 pts · investigation first
 - [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55
 - [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · after 30
 
