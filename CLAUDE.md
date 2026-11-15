@@ -359,7 +359,7 @@ Before making changes, always read:
 - `lib/enablebanking.ts` — understand the API auth pattern
 
 ## External Documentation
-- Enable Banking App IDs: sandbox `aa4b88a1-8b11-4065-881c-44a4435887e0` (Preview + local dev); production `d68013c4-50f9-4f6f-8155-8fcdf490eddf` (Vercel Production, restricted mode: only the owner's linked accounts)
+- Enable Banking App IDs: sandbox `aa4b88a1-8b11-4065-881c-44a4435887e0` (Preview + local dev); production `d68013c4-50f9-4f6f-8155-8fcdf490eddf` (Vercel Production, restricted mode: only the owner's linked accounts). Since late October 2026, Enable Banking answers support for restricted personal-use apps with an AI assistant only; human support is for trial/evaluation customers (ask about it with the production quote)
 - Enable Banking sandbox redirect: `https://backend-beryl-phi-32.vercel.app/auth/bank/callback`
 - Google OAuth redirect: `https://backend-beryl-phi-32.vercel.app/auth/google/callback`
 - Vercel URL: `https://backend-beryl-phi-32.vercel.app`
