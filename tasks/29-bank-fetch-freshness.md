@@ -1,6 +1,6 @@
 # 29 — Find out why a refresh returns stale bank data, and fix it
 
-- **Status:** Backlog. From `../../TESTING-1.0.md` #3 (backend half). App half is app task 52.
+- **Status:** Done 2026-11-15 as investigation only (1 pt); Part 2 not needed. From `../../TESTING-1.0.md` #3 (backend half). App half is app task 52.
 - **Size:** 3 pts (1 investigation + 2 fix).
 
 ## What was seen
@@ -37,4 +37,23 @@ Never log the IP.
   checked against production.
 
 ## Finding
-_(to be filled in by Part 1)_
+Probed production on 2026-11-15 (Danske, production app, real consent), 12:44–12:45 UTC:
+
+1. **Unattended limit: ruled out.** 5 fetches with `Psu-Ip-Address`/`Psu-User-Agent`,
+   then 6 without, within ~40 s: all **200**, identical data (12 transactions in 5 days).
+   No rate-limit headers on the responses. `GET /aspsps?country=DK` lists no
+   `required_psu_headers` for Danske. Request ids: attended `3e530b25…`, `af6a0d92…`,
+   `524448a8…`, `1928cb61…`, `25527999…`; unattended `d3753e61…`, `6a5555e2…`,
+   `6e075a30…`, `5ff1a335…`, `7e3e3948…`, `a7774b8b…`.
+2. **Bank-side caching: not shown.** Nothing booked between fetches, so a snapshot can't be
+   told apart from live data today. No sign of it.
+3. **Timing: likely.** Danske books 1–4 days after the purchase (an Apple Pay purchase on
+   11-11 booked 11-13). A booking landing between the phone refresh and the simulator
+   refresh looks exactly like the report.
+4. **Our code: likely, app side.** The app's `refresh()` returns at once if a fetch is
+   already running (TESTING #9 → app 53), and the app doesn't refresh on return to the
+   foreground (app 52). Backend logs from the original report are past Vercel's retention.
+
+**Outcome:** no backend fix for #3; app 52 + 53 are the fix. Sending PSU headers is still
+the correct way to mark a user-initiated fetch, and some banks (e.g. Länsförsäkringar)
+enforce the limit, so it's filed separately as task 37 at low priority.

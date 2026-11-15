@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **22 pts.**
+Remaining: **20 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -28,9 +28,8 @@ conventions before the big builds → **3** sheet features, with **new month (35
 by ~2026-11-27** so app 59 is live before 2026-12-01. If 35 slips, an agent creates the
 December tab with a one-off script so saves keep working.
 
-**Wave 1: daily use**
-- [29 — Find out why a refresh returns stale bank data, and fix it](tasks/29-bank-fetch-freshness.md) · 3 pts · investigation first; pairs with app 52
-- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · touches `/auth`, so after 29
+**Wave 1: daily use** (the stale-refresh fix for #3 is app 52 + 53; see task 29's finding)
+- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt
 
 **Wave 2: before building more**
 - [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
@@ -42,12 +41,15 @@ December tab with a one-off script so saves keep working.
 - [33 — Categories editor: rename, add, remove](tasks/33-categories-edit-structure.md) · 3 pts · after 32; app 57 needs it (CR-10)
 - [34 — Categories editor: budgets](tasks/34-categories-edit-budgets.md) · 2 pts · after 33; app 58 needs it (CR-10)
 
+**Wave 4: low priority**
+- [37 — Send PSU headers on user-initiated bank fetches](tasks/37-psu-headers.md) · 1 pt · Danske doesn't need it today (task 29); protects other banks
+
 ## Done
 Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
-- (none yet)
+- [29 — Find out why a refresh returns stale bank data](tasks/29-bank-fetch-freshness.md) · 1 pt · 2026-11-15
 
 ### V1 — up to 2026-10-21
 
