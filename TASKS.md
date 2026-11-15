@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **20 pts.**
+Remaining: **19 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -29,7 +29,7 @@ by ~2026-11-27** so app 59 is live before 2026-12-01. If 35 slips, an agent crea
 December tab with a one-off script so saves keep working.
 
 **Wave 1: daily use** (the stale-refresh fix for #3 is app 52 + 53; see task 29's finding)
-- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt
+- (none left on the backend)
 
 **Wave 2: before building more**
 - [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
@@ -49,6 +49,7 @@ Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
+- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · 2026-11-15
 - [29 — Find out why a refresh returns stale bank data](tasks/29-bank-fetch-freshness.md) · 1 pt · 2026-11-15
 
 ### V1 — up to 2026-10-21

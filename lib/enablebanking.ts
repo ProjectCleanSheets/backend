@@ -199,7 +199,12 @@ export async function startAuthSession(state: string, aspsp: Aspsp): Promise<str
     // lib/time.ts). `Date.now()` carries milliseconds ~999 times in 1000, so
     // requesting a truncated instant makes a verbatim echo harmless instead of
     // relying on Enable Banking to round it for us.
-    access: { valid_until: toWholeSecondISO(validUntil) },
+    access: {
+      valid_until: toWholeSecondISO(validUntil),
+      // The queue reads 30 days, so never send the user through the extra
+      // consent some banks require for history older than 90 days.
+      transactions_extended_history: false,
+    },
     aspsp,
     redirect_url: REDIRECT_URI,
     state,

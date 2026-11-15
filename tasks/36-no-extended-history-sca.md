@@ -1,6 +1,6 @@
 # 36 — Don't ask for the extra bank approval for old history
 
-- **Status:** Backlog. From Enable Banking's October 2026 changelog (core 0.16.9, 2026-11-05).
+- **Status:** Done 2026-11-15. From Enable Banking's October 2026 changelog (core 0.16.9, 2026-11-05).
 - **Size:** 1 pt.
 
 ## Why
@@ -23,3 +23,11 @@ With `false`, the full history is still returned where the bank gives it without
 ## Done when
 `/auth` requests carry `transactions_extended_history: false`, tests pass, and a
 sandbox connect round-trips.
+
+## Done
+`startAuthSession` sends `transactions_extended_history: false`. Verified 2026-11-15:
+stubbed `fetch` shows the `/auth` body as
+`{"valid_until":"<whole seconds>Z","transactions_extended_history":false}`; a live
+`POST /auth` was accepted by the sandbox (Mock ASPSP) and by production for Danske Bank
+(auth started only, nothing authorised). `tsc` green. Takes effect on the next bank
+connect; the existing consent is untouched.
