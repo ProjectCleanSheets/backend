@@ -23,15 +23,24 @@ task until it has a task file and a Backlog line here.
 - (none)
 
 ## Backlog
+Ordered by priority (set 2026-11-15). Waves: **1** daily-use fixes → **2** review and
+conventions before the big builds → **3** sheet features, with **new month (35) merged
+by ~2026-11-27** so app 59 is live before 2026-12-01. If 35 slips, an agent creates the
+December tab with a one-off script so saves keep working.
 
-- [29 — Find out why a refresh returns stale bank data, and fix it](tasks/29-bank-fetch-freshness.md) · 3 pts · investigation first
-- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · from Enable Banking changelog Oct 2026
+**Wave 1: daily use**
+- [29 — Find out why a refresh returns stale bank data, and fix it](tasks/29-bank-fetch-freshness.md) · 3 pts · investigation first; pairs with app 52
+- [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · touches `/auth`, so after 29
+
+**Wave 2: before building more**
+- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
+- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · after 30
+
+**Wave 3: the sheet from the app**
 - [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · **before 33–35**; every add/remove/new-month goes through it
+- [35 — Start a new month](tasks/35-start-new-month.md) · 3 pts · after 32; app 59 needs it (CR-10) · **deadline**: see above
 - [33 — Categories editor: rename, add, remove](tasks/33-categories-edit-structure.md) · 3 pts · after 32; app 57 needs it (CR-10)
 - [34 — Categories editor: budgets](tasks/34-categories-edit-budgets.md) · 2 pts · after 33; app 58 needs it (CR-10)
-- [35 — Start a new month](tasks/35-start-new-month.md) · 3 pts · after 32; app 59 needs it (CR-10)
-- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55
-- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · after 30
 
 ## Done
 Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
