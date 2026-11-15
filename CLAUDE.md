@@ -41,11 +41,13 @@ dangling. Full protocol is in the file's header.
 The ledger's "Open items" table is the only list of what is open — do not copy it here.
 
 ## Git Workflow
-The owner reviews every change before it enters git history:
-- **Never commit or push yourself.** Create the task's branch, implement on it, and
-  leave ALL changes uncommitted in the working tree — the owner reviews the diff,
-  then commits and pushes himself. This includes TASKS.md board edits and doc changes.
-- Only commit/push when explicitly told to in the current session.
+Same as the app (owner, 2026-11-15):
+- **Every task or bug gets its own branch**, pushed, and merged to `main` through a PR.
+  Never merge a task branch locally.
+- **Board and doc edits** (`TASKS.md`, `tasks/`, `*.md`) go straight to `main`.
+- **Merging to `main` deploys production on Vercel**, so test the branch first (sandbox,
+  or production read-only) and say in the PR how it was tested.
+- This repo has no GitHub Actions workflow, so a PR costs no CI minutes.
 
 ## Project Structure
 ```
