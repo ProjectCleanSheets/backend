@@ -20,7 +20,7 @@ task until it has a task file and a Backlog line here.
 
 ## In Progress
 
-- (none)
+- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
 
 ## Backlog
 Ordered by priority (set 2026-11-15). Waves: **1** daily-use fixes → **2** review and
@@ -32,7 +32,6 @@ December tab with a one-off script so saves keep working.
 - (none left on the backend)
 
 **Wave 2: before building more**
-- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
 - [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · after 30
 
 **Wave 3: the sheet from the app**
