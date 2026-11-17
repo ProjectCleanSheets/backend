@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **19 pts.**
+Remaining: **28 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -20,7 +20,7 @@ task until it has a task file and a Backlog line here.
 
 ## In Progress
 
-- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · review only; pairs with app 55. Any split of `lib/sheets.ts` it recommends goes before 32
+- (none)
 
 ## Backlog
 Ordered by priority (set 2026-11-15). Waves: **1** daily-use fixes → **2** review and
@@ -31,8 +31,15 @@ December tab with a one-off script so saves keep working.
 **Wave 1: daily use** (the stale-refresh fix for #3 is app 52 + 53; see task 29's finding)
 - (none left on the backend)
 
-**Wave 2: before building more**
-- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · after 30
+**Wave 2: before building more** (from 30's findings; 38 → 39 → 40 are on the path to 35)
+- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts
+- [38 — Committed tests for the pure sheet and bank logic](tasks/38-tests.md) · 2 pts · **before 32**
+- [39 — One home for sheet-layout reading](tasks/39-sheet-layout.md) · 3 pts · after 38, **before 32**
+- [40 — One Actual-cell read-modify-write](tasks/40-actual-cell.md) · 1 pt · after 39, **before 32**
+- [41 — Shared handler plumbing and error classes](tasks/41-handler-plumbing.md) · 2 pts · with 42; any time
+- [42 — Two small naming fixes](tasks/42-naming.md) · 1 pt · with 41
+- [43 — Comment and CLAUDE.md sweep](tasks/43-comment-sweep.md) · 2 pts · after 31
+- [44 — Document what each error code really covers](tasks/44-error-codes-doc.md) · 1 pt · docs only
 
 **Wave 3: the sheet from the app**
 - [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · **before 33–35**; every add/remove/new-month goes through it
@@ -48,6 +55,7 @@ Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
+- [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · 2026-11-17
 - [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · 2026-11-15
 - [29 — Find out why a refresh returns stale bank data](tasks/29-bank-fetch-freshness.md) · 1 pt · 2026-11-15
 

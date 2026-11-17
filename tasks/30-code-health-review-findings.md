@@ -1,5 +1,7 @@
 # 30 — Code-health review findings (backend)
 
+**Owner review 2026-11-17: all seven accepted** → 1→38, 2→39, 3→41, 4→40, 5→43, 6→44, 7→42.
+
 Reviewed 2026-11-17 on `main` (`549112f`). 25 TypeScript files, ~4,160 lines in `api/` and
 `lib/`. No refactoring was done; each accepted item becomes its own task.
 
