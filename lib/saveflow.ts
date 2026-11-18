@@ -5,10 +5,21 @@ import {
   DEFAULT_BUDGET_COLUMN,
   DEFAULT_CATEGORY_COLUMN,
   DEFAULT_LEFT_COLUMN,
+  SHEET_SCAN_MAX_ROWS,
 } from './constants';
 import type { ErrorCode } from './errors';
 import { buildLogMatcher, LOG_HEADER, LOG_RANGE, LOG_TAB, parseLogRows } from './logtab';
-import { addHiddenTab, appendRow, readRange, type Sheets, type TabInfo } from './sheets';
+import { findCategoryRow, numberOrNull } from './sheetlayout';
+import {
+  addHiddenTab,
+  appendRow,
+  type CellValue,
+  readRange,
+  readRanges,
+  type Sheets,
+  type TabInfo,
+  writeCell,
+} from './sheets';
 import { getSupabase } from './supabase';
 
 // The save pipeline shared by POST /api/sheet/save and POST /api/sheet/category
@@ -178,4 +189,80 @@ const AMOUNT_ROUNDING_FACTOR = 10 ** AMOUNT_DECIMALS;
 
 export function roundAmount(value: number): number {
   return Math.round(value * AMOUNT_ROUNDING_FACTOR) / AMOUNT_ROUNDING_FACTOR;
+}
+
+/**
+ * Reads a section's category and Actual columns in one batchGet. The Actual
+ * column does two jobs: it tells a real box title from a summary row labelled
+ * like a section (a title never has a number beside it), and it holds the
+ * current values a save adds to, so no second read is needed.
+ */
+export async function readSectionColumns(
+  sheets: Sheets,
+  sheetId: string,
+  tab: string,
+  columns: Pick<SectionColumns, 'categoryCol' | 'actualCol'>,
+): Promise<{ categoryColumn: CellValue[][]; actualColumn: CellValue[][] }> {
+  const [categoryColumn = [], actualColumn = []] = await readRanges(sheets, sheetId, tab, [
+    `${columns.categoryCol}1:${columns.categoryCol}${SHEET_SCAN_MAX_ROWS}`,
+    `${columns.actualCol}1:${columns.actualCol}${SHEET_SCAN_MAX_ROWS}`,
+  ]);
+  return { categoryColumn, actualColumn };
+}
+
+/** The Actual value on a 1-based row; a blank or non-numeric cell counts as 0. */
+export function currentActualAt(actualColumn: CellValue[][], row: number): number {
+  return numberOrNull(actualColumn[row - 1]?.[0]) ?? 0;
+}
+
+export interface ActualCell {
+  row: number;
+  cell: string;
+  currentActual: number;
+}
+
+/**
+ * Finds the section+category row in the month tab and its current Actual value.
+ * Throws CATEGORY_NOT_FOUND when the box has no such category.
+ */
+export async function locateActualCell(
+  sheets: Sheets,
+  config: SheetConfig,
+  monthTab: string,
+  section: string,
+  category: string,
+): Promise<ActualCell> {
+  const columns = resolveColumns(config.columnMapping, section);
+  const { categoryColumn, actualColumn } = await readSectionColumns(
+    sheets,
+    config.sheetId,
+    monthTab,
+    columns,
+  );
+  const row = findCategoryRow(categoryColumn, section, category, columns.otherSections, actualColumn);
+  if (row === null) {
+    throw new SaveFlowError(
+      404,
+      'CATEGORY_NOT_FOUND',
+      `No row for category "${category}" under section "${section}" in tab "${monthTab}"`,
+    );
+  }
+  return { row, cell: `${columns.actualCol}${row}`, currentActual: currentActualAt(actualColumn, row) };
+}
+
+/**
+ * Adds `amount` (negative to undo) to the Actual cell and writes the rounded
+ * total back as a plain number. Returns the new total. The Left column is never
+ * touched: it is a formula.
+ */
+export async function addToActual(
+  sheets: Sheets,
+  sheetId: string,
+  tab: string,
+  target: ActualCell,
+  amount: number,
+): Promise<number> {
+  const newActual = roundAmount(target.currentActual + amount);
+  await writeCell(sheets, sheetId, tab, target.cell, newActual);
+  return newActual;
 }

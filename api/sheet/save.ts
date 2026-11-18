@@ -7,31 +7,19 @@ import {
   MAX_SECTION_NAME_LENGTH,
   MAX_TRANSACTION_AMOUNT,
   MAX_TRANSACTION_ID_LENGTH,
-  SHEET_SCAN_MAX_ROWS,
 } from '../../lib/constants';
 import { sendError } from '../../lib/errors';
 import { LOG_RANGE, LOG_TAB, type LogEntry, parseLogRows } from '../../lib/logtab';
 import {
+  addToActual,
   appendLogEntry,
   assertNotAlreadySaved,
   findMonthTab,
   loadSheetConfig,
-  resolveColumns,
-  roundAmount,
+  locateActualCell,
   SaveFlowError,
-  type SheetConfig,
 } from '../../lib/saveflow';
-import { findCategoryRow } from '../../lib/sheetlayout';
-import {
-  deleteRow,
-  getSheetsForUser,
-  listTabInfo,
-  readRange,
-  readRanges,
-  type Sheets,
-  SheetsError,
-  writeCell,
-} from '../../lib/sheets';
+import { deleteRow, getSheetsForUser, listTabInfo, readRange, SheetsError } from '../../lib/sheets';
 
 // `date` and `status` describe the queue entry being saved: together with
 // transactionId and amount they form the composite dedup key (banks reuse one
@@ -109,8 +97,7 @@ async function handleSave(userId: string, req: VercelRequest, res: VercelRespons
     date,
     status,
   });
-  const newActual = roundAmount(target.currentActual + amount);
-  await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
+  const newActual = await addToActual(sheets, config.sheetId, monthTab, target, amount);
 
   res.status(200).json({ tab: monthTab, row: target.row, cell: target.cell, newActual });
 }
@@ -151,51 +138,10 @@ async function handleUndo(userId: string, req: VercelRequest, res: VercelRespons
   // reverse the Actual cell first, then drop the log row.
   const monthTab = findMonthTab(tabs).title;
   const target = await locateActualCell(sheets, config, monthTab, entry.section, entry.category);
-  const newActual = roundAmount(target.currentActual - entry.amount);
-  await writeCell(sheets, config.sheetId, monthTab, target.cell, newActual);
+  const newActual = await addToActual(sheets, config.sheetId, monthTab, target, -entry.amount);
   await deleteRow(sheets, config.sheetId, logTab.tabId, entry.rowNumber);
 
   res.status(200).json({ tab: monthTab, row: target.row, cell: target.cell, newActual });
-}
-
-/**
- * Resolves the section's columns from the stored mapping (CLAUDE.md defaults
- * otherwise), scans the category column for the section+category row, and
- * reads that row's current Actual value. The Left column is never touched.
- */
-async function locateActualCell(
-  sheets: Sheets,
-  config: SheetConfig,
-  monthTab: string,
-  section: string,
-  category: string,
-): Promise<{ row: number; cell: string; currentActual: number }> {
-  const { categoryCol, actualCol, otherSections } = resolveColumns(config.columnMapping, section);
-
-  // Category and Actual columns in one batchGet. The Actual column is the
-  // title disambiguator (task 14): a summary row labeled like a section —
-  // Cash flow's "Income" line — has a number beside it, a real box title
-  // never does. It also supplies the current cell value without a second
-  // read.
-  const [column = [], actualColumn = []] = await readRanges(sheets, config.sheetId, monthTab, [
-    `${categoryCol}1:${categoryCol}${SHEET_SCAN_MAX_ROWS}`,
-    `${actualCol}1:${actualCol}${SHEET_SCAN_MAX_ROWS}`,
-  ]);
-  const row = findCategoryRow(column, section, category, otherSections, actualColumn);
-  if (row === null) {
-    throw new SaveFlowError(
-      404,
-      'CATEGORY_NOT_FOUND',
-      `No row for category "${category}" under section "${section}" in tab "${monthTab}"`,
-    );
-  }
-
-  const cell = `${actualCol}${row}`;
-  const actualValue = actualColumn[row - 1]?.[0];
-  // A blank Actual cell counts as 0; the cells are plain manually-typed totals.
-  const currentActual =
-    typeof actualValue === 'number' && Number.isFinite(actualValue) ? actualValue : 0;
-  return { row, cell, currentActual };
 }
 
 function findLastById(entries: LogEntry[], transactionId: string): LogEntry | undefined {
