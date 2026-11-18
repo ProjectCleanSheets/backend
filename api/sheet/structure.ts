@@ -214,8 +214,7 @@ function overlapsPair(
   return spans !== undefined && spans.some(([start, end]) => start <= toCol && fromCol <= end);
 }
 
-// Exported so the detection heuristics can be exercised directly; Vercel only
-// routes the default export.
+// Exported for test/sheetlayout.test.ts; Vercel routes only the default export.
 export function detectSections(grid: CellValue[][]): DetectedSection[] {
   const headers: HeaderPair[] = [];
   // Every pair's column span per row, including pairs without a resolvable

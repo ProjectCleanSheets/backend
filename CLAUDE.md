@@ -77,6 +77,7 @@ backend/
 │   ├── enablebanking.ts       — Enable Banking API helper
 │   └── crypto.ts              — token encryption/decryption
 ├── supabase/migrations/       — SQL migrations
+├── test/                      — `npm test`: unit tests for the pure logic, + fixtures/
 ├── tasks/                     — task board task files (see TASKS.md)
 ├── openapi.json               — OpenAPI spec, rendered at /api/docs
 ├── TASKS.md                   — task board
@@ -393,8 +394,9 @@ committed test uses it.
 not a throwaway stub. Pure logic (layout scans, dedup keys, mapping, status computation)
 is tested directly; Google, Enable Banking and Supabase calls are checked against
 sandbox/Preview and described in the PR. A pure move or rename changes no test except to
-follow it, and says so in its PR. Run `npm run typecheck` (and `npm test` once it exists)
-before pushing.
+follow it, and says so in its PR. Run `npm run typecheck` and `npm test` before pushing.
+Tests live in `test/` (`node --test` through `tsx`); shared sheet fixtures are in
+`test/fixtures/`.
 
 **Say when it got harder.** If a change makes something harder to follow (a workaround, a
 second path, a known gap), say so in the task file's Done note so a later task can pay it
