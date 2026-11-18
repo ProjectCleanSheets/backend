@@ -302,7 +302,7 @@ export interface BankStatus {
 }
 
 /**
- * Pure status computation, exported for tests. A missing consent (never
+ * Pure status computation, exported for test/bank.test.ts. A missing consent (never
  * connected, or no expiry stored) reports as expired — from Settings' point of
  * view the fix is the same: (re)connect the bank.
  */

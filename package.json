@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test 'test/**/*.test.ts'"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0",
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "@vercel/node": "^5.8.22",
+    "tsx": "4.21.0",
     "typescript": "^6.0.3"
   }
 }

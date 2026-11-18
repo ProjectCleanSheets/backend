@@ -104,9 +104,7 @@ function sendEnableBankingError(res: VercelResponse, err: EnableBankingError): v
   );
 }
 
-// Exported so the fetch/filter pipeline can be exercised directly; Vercel only
-// routes the default export.
-export async function fetchUncategorized(
+async function fetchUncategorized(
   userId: string,
 ): Promise<{ transactions: QueueTransaction[]; logTabMissing: boolean }> {
   const { data, error } = await getSupabase()
@@ -197,9 +195,8 @@ async function readLogMatcher(
  * reserved Danske payment must show up while the user still remembers it
  * (product decision; spec §7b's id-reissue-on-settlement risk accepted as
  * rare). Cancelled/rejected/informational entries and entries without a
- * bank-assigned id (nothing to dedup or save against) are dropped. Exported
- * so the mapping can be exercised directly; Vercel only routes the default
- * export.
+ * bank-assigned id (nothing to dedup or save against) are dropped.
+ * Exported for test/bank.test.ts; Vercel routes only the default export.
  */
 export function toQueueTransaction(tx: EnableBankingTransaction): QueueTransaction | null {
   if (tx.status !== 'BOOK' && tx.status !== 'PDNG') {

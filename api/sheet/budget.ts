@@ -155,8 +155,7 @@ function numberOrNull(cell: CellValue | undefined): number | null {
  * older month tabs may predate a section. Blank or non-numeric Budget/Actual
  * cells stay null per category and count as 0 in totals.
  *
- * Exported so the assembly logic can be exercised directly; Vercel only
- * routes the default export.
+ * Exported for test/saveflow.test.ts; Vercel routes only the default export.
  */
 export function buildBudgetOverview(
   resolved: ResolvedSection[],
