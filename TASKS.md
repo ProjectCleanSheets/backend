@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **28 pts.**
+Remaining: **26 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -32,7 +32,6 @@ December tab with a one-off script so saves keep working.
 - (none left on the backend)
 
 **Wave 2: before building more** (from 30's findings; 38 → 39 → 40 are on the path to 35)
-- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts
 - [38 — Committed tests for the pure sheet and bank logic](tasks/38-tests.md) · 2 pts · **before 32**
 - [39 — One home for sheet-layout reading](tasks/39-sheet-layout.md) · 3 pts · after 38, **before 32**
 - [40 — One Actual-cell read-modify-write](tasks/40-actual-cell.md) · 1 pt · after 39, **before 32**
@@ -55,6 +54,7 @@ Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
+- [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · 2026-11-18
 - [30 — Code-health review](tasks/30-code-health-review.md) · 3 pts · 2026-11-17
 - [36 — Don't ask for the extra bank approval for old history](tasks/36-no-extended-history-sca.md) · 1 pt · 2026-11-15
 - [29 — Find out why a refresh returns stale bank data](tasks/29-bank-fetch-freshness.md) · 1 pt · 2026-11-15

@@ -352,6 +352,54 @@ refresh token — the token itself is never stored), `user_id`, `expires_at`,
 - Every added or changed endpoint MUST be reflected in `openapi.json` (rendered at
   `/api/docs`) in the same branch — the Swagger page is the primary manual test tool
 
+## Code conventions
+Agents follow these on every change (task 31, from task 30's review). The owner does not
+read the code, so it has to stay readable without them. They add to Coding Principles
+above and never override Security Requirements.
+
+**Size and responsibility.** One `api/` file is one feature area (routing, validation, the
+response); one `lib/` module is one job. Split when an `api/` file passes about **250
+lines** or a `lib/` module about **300**, or sooner when it holds two jobs that change for
+different reasons — e.g. calling the Google API and parsing the sheet layout are two jobs.
+Split along the job, not the line count. A function doing three steps that each need a
+comment is three functions.
+
+**One copy of each rule.** Logic two endpoints share lives in `lib/` from the second use,
+not copied: the auth check, error-to-status mapping, the layout scan, the Actual-cell
+update. Before writing a helper, search `lib/` for one that already exists.
+
+**Comments say why, in the present tense.** A sentence or two on why the code is the way
+it is, or what would go wrong without it. Not what the next line obviously does.
+- **No history in code:** no task numbers, ledger ids, spec section numbers, dates, "the
+  owner found", or the story of how a bug was found. That belongs in the commit message
+  and the task file, where it is dated and cannot go stale.
+- A file header is a short paragraph: what the file is for and the one thing a reader
+  must know. Not a changelog.
+- When code changes, fix or delete the comments — and error messages — it made untrue.
+
+**Names.** A name means one thing across the backend; a function is named for what it
+does now, not what it did when it was written. Routes are the contract with the app and
+are not renamed casually — rename the function, keep the route.
+
+**Error responses.** Use the existing codes in Error Responses; don't invent one without a
+contract change in `openapi.json` and a ledger entry for the app. Messages tell the caller
+what to do next and name only real endpoints.
+
+**No dead code.** Delete unused code and exports rather than leaving them for later, and
+never commit commented-out code. Git has it. Don't export a function "for tests" unless a
+committed test uses it.
+
+**Tests come with behaviour.** Every behaviour change adds or updates a committed test —
+not a throwaway stub. Pure logic (layout scans, dedup keys, mapping, status computation)
+is tested directly; Google, Enable Banking and Supabase calls are checked against
+sandbox/Preview and described in the PR. A pure move or rename changes no test except to
+follow it, and says so in its PR. Run `npm run typecheck` (and `npm test` once it exists)
+before pushing.
+
+**Say when it got harder.** If a change makes something harder to follow (a workaround, a
+second path, a known gap), say so in the task file's Done note so a later task can pay it
+back.
+
 ## Key Files to Read First
 Before making changes, always read:
 - `TASKS.md` and your assigned task file in `tasks/` — scope and acceptance criteria
