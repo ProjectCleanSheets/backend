@@ -19,11 +19,11 @@ import {
   roundAmount,
   SaveFlowError,
 } from '../../lib/saveflow';
+import { scanSection } from '../../lib/sheetlayout';
 import {
   getSheetsForUser,
   listTabInfo,
   readRanges,
-  scanSection,
   SheetsError,
   writeCell,
 } from '../../lib/sheets';
@@ -81,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     // Names the box scanners treat as structure would make the new row
     // invisible to every future save: a "Total…" prefix ends a box, a
-    // section name starts one (see scanSection in lib/sheets.ts).
+    // section name starts one (see scanSection in lib/sheetlayout.ts).
     const lowerName = name.toLowerCase();
     const sectionNames = [section, ...columns.otherSections];
     if (/^total\b/i.test(name) || sectionNames.some((s) => s.trim().toLowerCase() === lowerName)) {

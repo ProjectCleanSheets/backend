@@ -11,14 +11,8 @@ import {
   SaveFlowError,
   type SectionColumns,
 } from '../../lib/saveflow';
-import {
-  type CellValue,
-  getSheetsForUser,
-  listTabInfo,
-  readRanges,
-  scanSection,
-  SheetsError,
-} from '../../lib/sheets';
+import { numberOrNull, scanSection } from '../../lib/sheetlayout';
+import { type CellValue, getSheetsForUser, listTabInfo, readRanges, SheetsError } from '../../lib/sheets';
 
 // Unlike structure.ts (which runs during onboarding), this endpoint reads the
 // sheet id from the caller's stored config — only `tab` comes from the query.
@@ -142,10 +136,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 // expense section except Income — inflows are not spending.
 function isExpenseSection(name: string): boolean {
   return name.trim().toLowerCase() !== 'income';
-}
-
-function numberOrNull(cell: CellValue | undefined): number | null {
-  return typeof cell === 'number' && Number.isFinite(cell) ? cell : null;
 }
 
 /**

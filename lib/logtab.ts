@@ -1,5 +1,6 @@
 import { AMOUNT_DECIMALS } from './constants';
-import { type CellValue, columnLetter } from './sheets';
+import { columnLetter } from './sheetlayout';
+import type { CellValue } from './sheets';
 
 // The hidden `_log` tab is the dedup source of truth (product spec §7b): one
 // row per saved transaction. The save endpoint and the transaction-queue
@@ -37,7 +38,7 @@ export interface LogEntry {
   status: string;
 }
 
-function cellText(cell: CellValue | undefined): string {
+function logCellText(cell: CellValue | undefined): string {
   if (typeof cell === 'string') {
     return cell.trim();
   }
@@ -52,7 +53,7 @@ function cellText(cell: CellValue | undefined): string {
 export function parseLogRows(rows: CellValue[][]): LogEntry[] {
   const entries: LogEntry[] = [];
   rows.forEach((row, index) => {
-    const transactionId = cellText(row[0]);
+    const transactionId = logCellText(row[0]);
     // A bank id can never equal the literal header label.
     if (!transactionId || transactionId === LOG_HEADER[0]) {
       return;
@@ -60,11 +61,11 @@ export function parseLogRows(rows: CellValue[][]): LogEntry[] {
     entries.push({
       rowNumber: index + 1,
       transactionId,
-      section: cellText(row[1]),
-      category: cellText(row[2]),
+      section: logCellText(row[1]),
+      category: logCellText(row[2]),
       amount: typeof row[3] === 'number' && Number.isFinite(row[3]) ? row[3] : null,
-      date: cellText(row[4]),
-      status: cellText(row[5]).toLowerCase(),
+      date: logCellText(row[4]),
+      status: logCellText(row[5]).toLowerCase(),
     });
   });
   return entries;

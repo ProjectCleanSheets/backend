@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { detectSections } from '../api/sheet/structure';
-import { columnIndex, columnLetter, findCategoryRow, scanSection } from '../lib/sheets';
+import {
+  columnIndex,
+  columnLetter,
+  detectSections,
+  findCategoryRow,
+  scanSection,
+} from '../lib/sheetlayout';
 import { DASHBOARD, toColumn, toGrid } from './fixtures/dashboard';
 
 const F = toColumn(DASHBOARD, 'F');
