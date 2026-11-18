@@ -7,26 +7,21 @@ import {
   MAX_SECTION_NAME_LENGTH,
   MAX_TRANSACTION_AMOUNT,
   MAX_TRANSACTION_ID_LENGTH,
-  SHEET_SCAN_MAX_ROWS,
 } from '../../lib/constants';
 import { sendError } from '../../lib/errors';
 import {
+  addToActual,
   appendLogEntry,
   assertNotAlreadySaved,
+  currentActualAt,
   findMonthTab,
   loadSheetConfig,
+  readSectionColumns,
   resolveColumns,
-  roundAmount,
   SaveFlowError,
 } from '../../lib/saveflow';
 import { scanSection } from '../../lib/sheetlayout';
-import {
-  getSheetsForUser,
-  listTabInfo,
-  readRanges,
-  SheetsError,
-  writeCell,
-} from '../../lib/sheets';
+import { getSheetsForUser, listTabInfo, SheetsError, writeCell } from '../../lib/sheets';
 
 // The optional save half needs the full task-05 dedup key (id + amount +
 // date + status — see lib/logtab.ts), so the four fields come together or
@@ -92,14 +87,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const tabs = await listTabInfo(sheets, config.sheetId);
     const monthTab = findMonthTab(tabs);
 
-    // Category and Actual columns in one batchGet; the Actual column keeps a
-    // summary row labeled like a section (Cash flow's "Income" line) from
-    // anchoring the scan on the wrong box (task 14).
-    const [column = [], actualColumn = []] = await readRanges(sheets, config.sheetId, monthTab.title, [
-      `${columns.categoryCol}1:${columns.categoryCol}${SHEET_SCAN_MAX_ROWS}`,
-      `${columns.actualCol}1:${columns.actualCol}${SHEET_SCAN_MAX_ROWS}`,
-    ]);
-    const scan = scanSection(column, section, columns.otherSections, actualColumn);
+    const { categoryColumn, actualColumn } = await readSectionColumns(
+      sheets,
+      config.sheetId,
+      monthTab.title,
+      columns,
+    );
+    const scan = scanSection(categoryColumn, section, columns.otherSections, actualColumn);
     if (!scan) {
       return sendError(
         res,
@@ -156,15 +150,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    // Task-05 ordering: `_log` first (crash-safety), then the Actual cell.
+    // `_log` first, then the Actual cell, so a crash between them can't
+    // double-count on retry.
     // The row was blank in the category column, but its Actual cell may hold
-    // a leftover value — read-modify-write like the save endpoint does. The
-    // value comes from the batchGet above; the name/budget writes since then
-    // never touch the Actual column.
-    const cell = `${columns.actualCol}${row}`;
-    const actualValue = actualColumn[row - 1]?.[0];
-    const currentActual =
-      typeof actualValue === 'number' && Number.isFinite(actualValue) ? actualValue : 0;
+    // a leftover value, so it is added to like any save. The value comes from
+    // the read above; the name/budget writes since then never touch the Actual
+    // column.
+    const target = {
+      row,
+      cell: `${columns.actualCol}${row}`,
+      currentActual: currentActualAt(actualColumn, row),
+    };
 
     await appendLogEntry(sheets, config.sheetId, {
       transactionId: save.transactionId,
@@ -174,10 +170,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       date: save.date,
       status: save.status,
     });
-    const newActual = roundAmount(currentActual + save.amount);
-    await writeCell(sheets, config.sheetId, monthTab.title, cell, newActual);
+    const newActual = await addToActual(sheets, config.sheetId, monthTab.title, target, save.amount);
 
-    res.status(200).json({ tab: monthTab.title, row, cell, newActual });
+    res.status(200).json({ tab: monthTab.title, row, cell: target.cell, newActual });
   } catch (err) {
     if (err instanceof SaveFlowError) {
       return sendError(res, err.status, err.code, err.message);
