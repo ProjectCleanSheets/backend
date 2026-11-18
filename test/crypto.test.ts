@@ -32,7 +32,8 @@ describe('OAuth state', () => {
     const [payload, signature] = createOAuthState('user-1').split('.');
     const forged = Buffer.from(JSON.stringify({ sub: 'user-2', exp: 9e9 })).toString('base64url');
     assert.equal(verifyOAuthState(`${forged}.${signature}`), null);
-    assert.equal(verifyOAuthState(`${payload}.x${signature!.slice(1)}`), null);
+    const flipped = (signature![0] === 'A' ? 'B' : 'A') + signature!.slice(1);
+    assert.equal(verifyOAuthState(`${payload}.${flipped}`), null);
     assert.equal(verifyOAuthState('garbage'), null);
   });
 });
