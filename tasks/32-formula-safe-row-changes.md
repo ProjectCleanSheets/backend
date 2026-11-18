@@ -1,6 +1,6 @@
 # 32 — Formula-safe row changes
 
-- **Status:** Backlog (approved 2026-11-11). From `../../TESTING-1.0.md` #5 and #12.
+- **Status:** In progress (approved 2026-11-11). From `../../TESTING-1.0.md` #5 and #12.
 - **Size:** 5 pts · backend. **Comes first:** tasks 33–35 all go through this.
 
 ## Why

@@ -20,7 +20,7 @@ task until it has a task file and a Backlog line here.
 
 ## In Progress
 
-- (none)
+- [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · **before 33–35**; every add/remove/new-month goes through it
 
 ## Backlog
 Ordered by priority (set 2026-11-15). Waves: **1** daily-use fixes → **2** review and
@@ -38,7 +38,6 @@ December tab with a one-off script so saves keep working.
 - [44 — Document what each error code really covers](tasks/44-error-codes-doc.md) · 1 pt · docs only
 
 **Wave 3: the sheet from the app**
-- [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · **before 33–35**; every add/remove/new-month goes through it
 - [35 — Start a new month](tasks/35-start-new-month.md) · 3 pts · after 32; app 59 needs it (CR-10) · **deadline**: see above
 - [33 — Categories editor: rename, add, remove](tasks/33-categories-edit-structure.md) · 3 pts · after 32; app 57 needs it (CR-10)
 - [34 — Categories editor: budgets](tasks/34-categories-edit-budgets.md) · 2 pts · after 33; app 58 needs it (CR-10)
