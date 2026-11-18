@@ -21,9 +21,9 @@ import {
   SaveFlowError,
   type SheetConfig,
 } from '../../lib/saveflow';
+import { findCategoryRow } from '../../lib/sheetlayout';
 import {
   deleteRow,
-  findCategoryRow,
   getSheetsForUser,
   listTabInfo,
   readRange,

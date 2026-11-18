@@ -72,7 +72,8 @@ backend/
 │   ├── auth.ts                — request authentication + identity-token sign in
 │   ├── session.ts             — backend access/refresh token mint, verify, rotate
 │   ├── supabase.ts            — Supabase client singleton
-│   ├── sheets.ts              — Google Sheets API helper (+ the shared Google OAuth client)
+│   ├── sheets.ts              — Google Sheets API calls (+ the shared Google OAuth client)
+│   ├── sheetlayout.ts         — reading the dashboard layout from fetched cells (pure; no API calls)
 │   ├── drive.ts               — Google Drive API helper (metadata only: the sheet picker's list)
 │   ├── enablebanking.ts       — Enable Banking API helper
 │   └── crypto.ts              — token encryption/decryption
@@ -407,7 +408,7 @@ Before making changes, always read:
 - `TASKS.md` and your assigned task file in `tasks/` — scope and acceptance criteria
 - `lib/auth.ts` + `lib/session.ts` — understand the two-token auth model
 - `lib/supabase.ts` — understand the client setup
-- `lib/sheets.ts` — understand how sheet navigation works
+- `lib/sheetlayout.ts` + `lib/sheets.ts` — how the layout is read, and how the sheet is called
 - `lib/enablebanking.ts` — understand the API auth pattern
 
 ## External Documentation
