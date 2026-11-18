@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **21 pts.**
+Remaining: **20 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -32,7 +32,6 @@ December tab with a one-off script so saves keep working.
 - (none left on the backend)
 
 **Wave 2: before building more** (from 30's findings; 38 → 39 → 40 are on the path to 35)
-- [40 — One Actual-cell read-modify-write](tasks/40-actual-cell.md) · 1 pt · after 39, **before 32**
 - [41 — Shared handler plumbing and error classes](tasks/41-handler-plumbing.md) · 2 pts · with 42; any time
 - [42 — Two small naming fixes](tasks/42-naming.md) · 1 pt · with 41
 - [43 — Comment and CLAUDE.md sweep](tasks/43-comment-sweep.md) · 2 pts · after 31
@@ -52,6 +51,7 @@ Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
+- [40 — One Actual-cell read-modify-write](tasks/40-actual-cell.md) · 1 pt · 2026-11-18
 - [39 — One home for sheet-layout reading](tasks/39-sheet-layout.md) · 3 pts · 2026-11-18
 - [38 — Committed tests for the pure sheet and bank logic](tasks/38-tests.md) · 2 pts · 2026-11-18
 - [31 — Coding conventions in CLAUDE.md](tasks/31-coding-conventions.md) · 2 pts · 2026-11-18
