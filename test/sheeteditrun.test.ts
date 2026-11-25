@@ -22,6 +22,9 @@ describe('insertCategoryRow', () => {
     assert.deepEqual([at(sim, 'K31'), at(sim, 'K32')], ['Software', 'Total']);
     assert.equal(at(sim, 'M32'), '=sum(M21:M31)');
     assert.equal(at(sim, 'C16'), '=G29+M32');
+    // Sheets leaves other tabs alone on this shift; the edit itself moves Overview along.
+    const overview = sim.snapshot().tabs.find((t) => t.title === 'Overview')!;
+    assert.equal(overview.cells[15]?.[1], '=November!M34');
     // Cash flow and Expenses beside the bills did not move.
     assert.deepEqual([at(sim, 'B30'), at(sim, 'F29')], [' Save & Invest', 'Total']);
   });
@@ -39,12 +42,12 @@ describe('insertCategoryRow', () => {
     const book = workbook();
     const original = formulaMap(book.tabs);
     const sim = simSheets(book, {
-      misbehave: (tab, formula) => (tab === 'Overview' ? formula.replace('M34', 'M33') : formula),
+      misbehave: (tab, formula) => (tab === 'November' ? formula.replace('M21:M31', 'M21:M30') : formula),
     });
     await assert.rejects(
       insertCategoryRow(sim.sheets, 'id', boxFor(book, 'Bills'), 'Water', null),
       (err: unknown) =>
-        err instanceof SaveFlowError && err.status === 409 && /Overview!B16 reads =NOVEMBER!M33/.test(err.message),
+        err instanceof SaveFlowError && err.status === 409 && /November!M32 reads =SUM\(M21:M30\)/.test(err.message),
     );
     assert.deepEqual(formulaMap(sim.snapshot().tabs), original);
     assert.deepEqual(trimmed(month(sim).cells), trimmed(book.tabs[1]!.cells));

@@ -19,7 +19,9 @@ import type { CellValue, TabGrid } from './sheets';
 //
 // Rows are inserted and deleted only inside the section's own columns (insertRange /
 // deleteRange with a row shift), because boxes sit side by side: a whole-row insert
-// would push blank rows into the neighbouring boxes too.
+// would push blank rows into the neighbouring boxes too. Sheets rewrites references
+// on the edited tab for such a shift but leaves other tabs' references (e.g. the
+// Overview tab's) pointing at the old cells, so the plan writes those itself.
 
 export interface Workbook {
   tabs: TabGrid[];
@@ -188,6 +190,7 @@ export function planInsert(book: Workbook, box: Box, name: string, budget: numbe
             fields: 'userEnteredValue',
           },
         },
+        ...otherTabWrites(book, shift, predicted.changes),
       ],
     },
   };
@@ -219,6 +222,7 @@ export function planDelete(book: Workbook, box: Box, category: string): PlanResu
       removedCells,
       requests: [
         { deleteRange: { range: gridRow(tab.tabId, target.row, span.colStart, span.colEnd), shiftDimension: 'ROWS' } },
+        ...otherTabWrites(book, shift, predicted.changes),
       ],
     },
   };
@@ -234,6 +238,24 @@ function findTab(book: Workbook, title: string): TabGrid | undefined {
 
 function gridRow(sheetId: number, row: number, colStart: number, colEnd: number): sheets_v4.Schema$GridRange {
   return { sheetId, startRowIndex: row - 1, endRowIndex: row, startColumnIndex: colStart, endColumnIndex: colEnd + 1 };
+}
+
+/** Writes each changed formula outside the edited tab, which Sheets would leave unchanged. */
+function otherTabWrites(book: Workbook, shift: RowShift, changes: FormulaChange[]): sheets_v4.Schema$Request[] {
+  return changes.flatMap((change) => {
+    const match = /^(.*)!([A-Z]+)(\d+)$/.exec(change.cell)!;
+    const tab = findTab(book, match[1]!);
+    if (!tab || tab.title === shift.tab) return [];
+    return [
+      {
+        updateCells: {
+          start: { sheetId: tab.tabId, rowIndex: Number(match[3]) - 1, columnIndex: lettersToIndex(match[2]!) },
+          rows: [{ values: [{ userEnteredValue: { formulaValue: change.after } }] }],
+          fields: 'userEnteredValue',
+        },
+      },
+    ];
+  });
 }
 
 /** Formulas on the tab that add up this box's value columns (the section's totals). */

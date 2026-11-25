@@ -47,6 +47,13 @@ describe('planInsert', () => {
     ]);
   });
 
+  test("formulas on other tabs are written by the edit, since Sheets won't move them", () => {
+    const book = workbook();
+    const p = plan(planInsert(book, boxFor(book, 'Bills'), 'Water', 120));
+    const writes = p.requests.slice(3).map((r) => [r.updateCells?.start, r.updateCells?.rows?.[0]?.values?.[0]?.userEnteredValue]);
+    assert.deepEqual(writes, [[{ sheetId: 1, rowIndex: 15, columnIndex: 1 }, { formulaValue: '=November!M34' }]]);
+  });
+
   test('Expenses has spare rows inside its totals, so the new row goes right after the last category', () => {
     const book = workbook();
     const p = plan(planInsert(book, boxFor(book, 'Expenses'), 'Pets', null));
