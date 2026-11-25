@@ -5,9 +5,10 @@ import type { Workbook } from '../../lib/sheetedit';
 
 // A small in-memory Google Sheets for the calls the backend makes: reads in the
 // three render modes, single-cell writes, appends, and the batchUpdate requests a
-// row edit sends. Reference rewriting on insert/delete follows Sheets' documented
-// behaviour via lib/formularefs; `misbehave` lets a test make "Sheets" disagree
-// with the plan, to exercise the check and the undo.
+// row edit sends. Reference rewriting on insert/delete follows what Sheets does
+// with a shift inside some columns, via lib/formularefs: formulas on the edited tab
+// are rewritten, formulas on other tabs are left as they were. `misbehave` lets a
+// test make "Sheets" disagree with the plan, to exercise the check and the undo.
 export interface SimOptions {
   /** Called with each formula Sheets rewrote; return something else to simulate a surprise. */
   misbehave?: (tab: string, formula: string) => string;
@@ -58,8 +59,8 @@ export function simSheets(book: Workbook, options: SimOptions = {}) {
     return out;
   };
 
-  const rewriteAll = (shift: RowShift) => {
-    for (const tab of tabs) {
+  const rewriteTab = (shift: RowShift) => {
+    for (const tab of tabs.filter((t) => t.title === shift.tab)) {
       tab.cells = tab.cells.map((row) =>
         row.map((v) => {
           if (typeof v !== 'string' || !v.startsWith('=')) return v;
@@ -76,7 +77,7 @@ export function simSheets(book: Workbook, options: SimOptions = {}) {
     const row = (range.startRowIndex ?? 0) + 1;
     const [c1, c2] = [range.startColumnIndex ?? 0, (range.endColumnIndex ?? 1) - 1];
     const shift: RowShift = { tab: tab.title, kind, row, colStart: c1, colEnd: c2 };
-    rewriteAll(shift);
+    rewriteTab(shift);
     const height = tab.cells.length + 1;
     const take = (r: number, c: number) => tab.cells[r - 1]?.[c] ?? '';
     const next: CellValue[][] = [];
