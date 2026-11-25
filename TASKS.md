@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **15 pts.**
+Remaining: **16 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -36,6 +36,7 @@ December tab with a one-off script so saves keep working.
 - [42 — Two small naming fixes](tasks/42-naming.md) · 1 pt · with 41
 - [43 — Comment and CLAUDE.md sweep](tasks/43-comment-sweep.md) · 2 pts · after 31
 - [44 — Document what each error code really covers](tasks/44-error-codes-doc.md) · 1 pt · docs only
+- [45 — Google rate limit reported as "sheet not found"](tasks/45-rate-limit-error.md) · 1 pt · any time
 
 **Wave 3: the sheet from the app**
 - [35 — Start a new month](tasks/35-start-new-month.md) · 3 pts · after 32; app 59 needs it (CR-10) · **deadline**: see above
