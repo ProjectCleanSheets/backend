@@ -12,7 +12,7 @@ Single source of truth for backend work. One task = one branch = one agent sessi
 file in `tasks/` and a Backlog entry *before* implementation starts — no untracked work.
 
 Story points use the classic Fibonacci scale (1, 2, 3, 5, 8, 13).
-Remaining: **20 pts.**
+Remaining: **15 pts.**
 
 **Phase 2 (from 2026-11-11).** V1 is live in production. The next backlog comes from
 the owner's hands-on testing, logged raw in `../TESTING-1.0.md`; an entry there is not a
@@ -20,7 +20,7 @@ task until it has a task file and a Backlog line here.
 
 ## In Progress
 
-- [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · **before 33–35**; every add/remove/new-month goes through it
+- (none)
 
 ## Backlog
 Ordered by priority (set 2026-11-15). Waves: **1** daily-use fixes → **2** review and
@@ -50,6 +50,7 @@ Newest first. Full verification notes: [`tasks/DONE-LOG.md`](tasks/DONE-LOG.md).
 
 ### Phase 2
 
+- [32 — Formula-safe row changes](tasks/32-formula-safe-row-changes.md) · 5 pts · 2026-11-25
 - [40 — One Actual-cell read-modify-write](tasks/40-actual-cell.md) · 1 pt · 2026-11-18
 - [39 — One home for sheet-layout reading](tasks/39-sheet-layout.md) · 3 pts · 2026-11-18
 - [38 — Committed tests for the pure sheet and bank logic](tasks/38-tests.md) · 2 pts · 2026-11-18
