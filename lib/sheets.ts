@@ -281,3 +281,66 @@ export async function deleteRow(
     throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not update the sheet'));
   }
 }
+
+export interface TabGrid {
+  title: string;
+  tabId: number;
+  /** Cell contents as typed: formulas as text ("=SUM(G13:G28)"), plain values as values. */
+  cells: CellValue[][];
+  /** Formatted values (what the user sees), used to spot error results like #REF!. */
+  shown: CellValue[][];
+  merges: sheets_v4.Schema$GridRange[];
+}
+
+/**
+ * Every tab except the hidden `_log`, with its formulas, shown values and merges:
+ * the snapshot a structural edit is planned and checked against. Three API calls.
+ */
+export async function readWorkbook(
+  sheets: Sheets,
+  spreadsheetId: string,
+  skipTabs: string[],
+): Promise<{ tabs: TabGrid[]; namedRangeTabIds: number[] }> {
+  try {
+    const { data } = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'namedRanges(range(sheetId)),sheets(properties(title,sheetId),merges)',
+    });
+    const meta = (data.sheets ?? [])
+      .map((s) => ({ title: s.properties?.title, tabId: s.properties?.sheetId, merges: s.merges ?? [] }))
+      .filter(
+        (s): s is { title: string; tabId: number; merges: sheets_v4.Schema$GridRange[] } =>
+          typeof s.title === 'string' && typeof s.tabId === 'number' && !skipTabs.includes(s.title),
+      );
+    const ranges = meta.map((s) => `'${s.title.replace(/'/g, "''")}'`);
+    const [formulas, shown] = await Promise.all(
+      (['FORMULA', 'FORMATTED_VALUE'] as const).map((valueRenderOption) =>
+        sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges, valueRenderOption }),
+      ),
+    );
+    const tabs = meta.map((s, i) => ({
+      ...s,
+      cells: (formulas!.data.valueRanges?.[i]?.values ?? []) as CellValue[][],
+      shown: (shown!.data.valueRanges?.[i]?.values ?? []) as CellValue[][],
+    }));
+    const namedRangeTabIds = (data.namedRanges ?? [])
+      .map((n) => n.range?.sheetId ?? 0)
+      .filter((id): id is number => typeof id === 'number');
+    return { tabs, namedRangeTabIds };
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_NOT_FOUND', 'Could not read the spreadsheet'));
+  }
+}
+
+/** Applies structural requests in one batchUpdate: Sheets applies all of them or none. */
+export async function batchUpdate(
+  sheets: Sheets,
+  spreadsheetId: string,
+  requests: sheets_v4.Schema$Request[],
+): Promise<void> {
+  try {
+    await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } });
+  } catch (err) {
+    throw toSheetsError(err, new SheetsError('SHEET_WRITE_FAILED', 'Could not update the sheet'));
+  }
+}

@@ -13,15 +13,16 @@ import {
   addToActual,
   appendLogEntry,
   assertNotAlreadySaved,
-  currentActualAt,
   findMonthTab,
   loadSheetConfig,
   readSectionColumns,
   resolveColumns,
   SaveFlowError,
 } from '../../lib/saveflow';
+import { boxOf } from '../../lib/sheetedit';
+import { insertCategoryRow } from '../../lib/sheeteditrun';
 import { scanSection } from '../../lib/sheetlayout';
-import { getSheetsForUser, listTabInfo, SheetsError, writeCell } from '../../lib/sheets';
+import { getSheetsForUser, listTabInfo, SheetsError } from '../../lib/sheets';
 
 // The optional save half needs the full task-05 dedup key (id + amount +
 // date + status — see lib/logtab.ts), so the four fields come together or
@@ -45,13 +46,12 @@ const bodySchema = z
   );
 
 /**
- * POST — create a new category in the current month tab by writing into the
- * section box's first free row (boxes keep spare formatted rows above their
- * Total — nothing is inserted or shifted); optionally categorize a
- * transaction to it in the same request (US-03 AC-3: "+ New Category").
- * Write order for crash-safety: dedup gate → name/budget → `_log` row →
- * Actual cell, so a duplicate save leaves no partial state and a crashed
- * request can never double-count on retry (spec §7b).
+ * POST — create a new category in the current month tab as a real row inside the
+ * section box, inserted so every total grows to include it and no formula breaks
+ * (lib/sheetedit.ts; refused with nothing changed when that can't be guaranteed).
+ * Optionally categorizes a transaction to it in the same request. Write order:
+ * dedup gate → new row → `_log` row → Actual cell, so a duplicate save leaves no
+ * partial state and a crashed request can't double-count on retry.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
@@ -110,16 +110,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         `Category "${name}" already exists in section "${section}"`,
       );
     }
-    if (scan.freeRow === null) {
-      return sendError(
-        res,
-        409,
-        'INVALID_REQUEST',
-        `No empty row in section "${section}" — add a row above the section's Total in the sheet first`,
-      );
-    }
-    const row = scan.freeRow;
-
     // Dedup gate before any mutation: an already-saved transaction must not
     // leave an orphan category row behind.
     const save =
@@ -140,10 +130,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       });
     }
 
-    await writeCell(sheets, config.sheetId, monthTab.title, `${columns.categoryCol}${row}`, name);
-    if (budget !== undefined && columns.budgetCol !== null) {
-      await writeCell(sheets, config.sheetId, monthTab.title, `${columns.budgetCol}${row}`, budget);
-    }
+    const { row } = await insertCategoryRow(
+      sheets,
+      config.sheetId,
+      boxOf(monthTab.title, section, columns, scan.categories),
+      name,
+      budget ?? null,
+    );
 
     if (!save) {
       res.status(200).json({ tab: monthTab.title, row });
@@ -151,16 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     // `_log` first, then the Actual cell, so a crash between them can't
-    // double-count on retry.
-    // The row was blank in the category column, but its Actual cell may hold
-    // a leftover value, so it is added to like any save. The value comes from
-    // the read above; the name/budget writes since then never touch the Actual
-    // column.
-    const target = {
-      row,
-      cell: `${columns.actualCol}${row}`,
-      currentActual: currentActualAt(actualColumn, row),
-    };
+    // double-count on retry. The inserted row's Actual starts empty.
+    const target = { row, cell: `${columns.actualCol}${row}`, currentActual: 0 };
 
     await appendLogEntry(sheets, config.sheetId, {
       transactionId: save.transactionId,

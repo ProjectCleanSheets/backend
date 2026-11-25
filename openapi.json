@@ -905,7 +905,7 @@
       "post": {
         "tags": ["sheet"],
         "summary": "Create a new category row — optionally categorize a transaction to it in one step",
-        "description": "Creates a new category in the `section` box of the current month tab by writing `name` (and the optional `budget`) into the box's first empty row — the spare formatted rows above the section's Total. Nothing is inserted or shifted, so the dashboard layout, formatting, and Total formulas are untouched; the Left column is never written to. A duplicate category name in the section is rejected with 409, as is a box with no empty row left (add one in the sheet first). When `transactionId` + `amount` + `date` + `status` are provided, the transaction is saved to the new category in the same request with the exact `/api/sheet/save` semantics: the dedup gate runs BEFORE the row is written (an already-saved transaction leaves no orphan category), and the `_log` entry is written before the Actual cell (crash-safety per product spec §7b). If the request dies after the name was written, retrying returns 409 (duplicate category) — save the transaction via POST /api/sheet/save instead.",
+        "description": "Creates a new category in the `section` box of the current month tab as a real row inserted inside the box, so every total over the box grows to include it. Only the box's own columns shift (boxes sit side by side), and every formula in the workbook is checked afterwards against exactly how it should read; on any difference the change is undone. The row goes right after the last category when the totals already cover spare rows, otherwise just above the last category. It copies the formatting and formulas (e.g. Left) of the row above; `name` and the optional `budget` are written into it. Refused with 409 and nothing changed when a formula can't be kept intact: e.g. a formula using INDIRECT/OFFSET, a range crossing the box's edge, a merged cell across the row, or totals that can't grow. The message names the cell. A duplicate category name in the section is also rejected with 409. When `transactionId` + `amount` + `date` + `status` are provided, the transaction is saved to the new category in the same request with the exact `/api/sheet/save` semantics: the dedup gate runs BEFORE the row is added (an already-saved transaction leaves no orphan category), and the `_log` entry is written before the Actual cell. If the request dies after the row was added, retrying returns 409 (duplicate category); save the transaction via POST /api/sheet/save instead.",
         "requestBody": {
           "required": true,
           "content": {
@@ -950,7 +950,7 @@
             }
           },
           "409": {
-            "description": "Category already exists in the section, the section has no empty row left, or the transaction was already saved (`INVALID_REQUEST`)",
+            "description": "Category already exists in the section, the row can't be added without risking a formula (nothing was changed; the message names the cell), or the transaction was already saved (`INVALID_REQUEST`)",
             "content": {
               "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
             }

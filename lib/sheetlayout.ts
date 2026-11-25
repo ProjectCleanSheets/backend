@@ -52,13 +52,6 @@ function firstCellText(row: CellValue[] | undefined): string {
 export interface SectionScan {
   /** The box's category rows (1-based, cell text trimmed) in sheet order. */
   categories: { row: number; name: string }[];
-  /**
-   * First blank row after the last category (1-based) — boxes keep spare
-   * formatted rows above their Total, so a new category is written there
-   * without moving anything. Null when the box has no free row (Total or the
-   * next box's banner sits right below the last category).
-   */
-  freeRow: number | null;
 }
 
 /**
@@ -96,12 +89,10 @@ export function scanSection(
   }
 
   const categories: SectionScan['categories'] = [];
-  let freeRow: number | null = null;
   for (let i = titleIndex + 1; i < column.length; i++) {
     const text = firstCellText(column[i]);
     if (!text) {
       if (categories.length > 0) {
-        freeRow = i + 1;
         break;
       }
       if (i - titleIndex > HEADER_GAP_ROWS) {
@@ -118,7 +109,7 @@ export function scanSection(
     }
     categories.push({ row: i + 1, name: text });
   }
-  return { categories, freeRow };
+  return { categories };
 }
 
 /**

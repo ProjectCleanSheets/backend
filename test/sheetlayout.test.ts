@@ -25,7 +25,7 @@ describe('columnLetter / columnIndex', () => {
 });
 
 describe('scanSection', () => {
-  test('reads a box under a merged banner and finds its first free row', () => {
+  test('reads a box under a merged banner', () => {
     const scan = scanSection(F, 'Expenses', ['Bills', 'Liabilities'], H);
     assert.deepEqual(scan, {
       categories: [
@@ -33,18 +33,16 @@ describe('scanSection', () => {
         { row: 5, name: 'Transport' },
         { row: 6, name: 'Eating out' },
       ],
-      freeRow: 7,
     });
   });
 
-  test('a box followed directly by another box has no free row', () => {
+  test('a box followed directly by another box ends at its title', () => {
     const scan = scanSection(F, 'Bills', ['Expenses', 'Liabilities'], I);
     assert.deepEqual(scan, {
       categories: [
         { row: 13, name: 'Rent' },
         { row: 14, name: 'Internet' },
       ],
-      freeRow: null,
     });
   });
 
@@ -60,7 +58,6 @@ describe('scanSection', () => {
         { row: 11, name: 'Salary' },
         { row: 12, name: 'Other' },
       ],
-      freeRow: null,
     });
   });
 
